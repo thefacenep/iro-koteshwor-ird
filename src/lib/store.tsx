@@ -71,8 +71,8 @@ function save(key: string, value: unknown) {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => load<Lang>("np-rev-lang", "en"));
   const [user, setUser] = useState<User | null>(() => load<User | null>("np-rev-user", null));
-  const [imported, setImported] = useState<RevenueRecord[]>(() => load<RevenueRecord[]>("np-rev-imports", []));
-  const [logs, setLogs] = useState<LogEntry[]>(() => load<LogEntry[]>("np-rev-logs", []));
+  const [imported, setImported] = useState<RevenueRecord[]>(() => load<RevenueRecord[]>("np-rev-imports-v2", []));
+  const [logs, setLogs] = useState<LogEntry[]>(() => load<LogEntry[]>("np-rev-logs-v2", []));
   const [fontStep, setFontStepState] = useState<number>(() => load<number>("np-rev-font", 0));
   const [boardOpen, setBoardOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);

@@ -18,7 +18,7 @@ export interface MonthDef {
 
 export interface RevenueRecord {
   id: string;
-  fy: string; // "2081/82"
+  fy: string; // "2082/083"
   month: number; // 0 = Shrawan .. 11 = Ashadh
   category: CategoryId;
   collected: number; // NPR billions (arba)
@@ -28,8 +28,8 @@ export interface RevenueRecord {
   importedAt?: number;
 }
 
-export const CURRENT_FY = "2081/82";
-export const PREV_FY = "2080/81";
+export const CURRENT_FY = "2082/083";
+export const PREV_FY = "2081/082";
 
 export const CATEGORIES: Category[] = [
   { id: "income", en: "Income Tax", np: "आय कर", shortEn: "Income", shortNp: "आय", color: "#c8102e" },

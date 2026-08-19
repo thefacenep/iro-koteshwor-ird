@@ -1,8 +1,65 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { CURRENT_FY } from "../data/seed";
-import { fmtDateTime, fmtInt } from "../lib/format";
+import { fmtDateTime, fmtInt, toNpDigits } from "../lib/format";
 import { useApp } from "../lib/store";
 import { Emblem } from "./ui";
+
+/* ================= Live clock + temperature (Koteshwor, Kathmandu) ================= */
+function ClockTempWidget() {
+  const { lang } = useApp();
+  const [now, setNow] = useState(() => new Date());
+  const [temp, setTemp] = useState<number | null>(null);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const fetchTemp = () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      fetch("https://api.open-meteo.com/v1/forecast?latitude=27.7017&longitude=85.3206&current=temperature_2m")
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("weather unavailable"))))
+        .then((d) => {
+          if (alive && typeof d?.current?.temperature_2m === "number") setTemp(Math.round(d.current.temperature_2m));
+        })
+        .catch(() => {
+          /* offline or API unreachable — keep last known value */
+        });
+    };
+    fetchTemp();
+    const id = window.setInterval(fetchTemp, 5 * 60 * 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const timeStr = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(now);
+  const displayTime = lang === "np" ? toNpDigits(timeStr) : timeStr;
+  const displayTemp = temp === null ? "--°C" : `${lang === "np" ? toNpDigits(String(temp)) : temp}°C`;
+
+  return (
+    <span
+      className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 font-bold tabular-nums text-white"
+      aria-label={lang === "np" ? "प्रणाली समय र तापक्रम" : "System time and temperature"}
+      title={lang === "np" ? "कोटेश्वर, काठमाडौँ — स्थानीय तापक्रम" : "Koteshwor, Kathmandu — local temperature"}
+    >
+      <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true" className="text-gold">
+        <circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M8 4.6V8l2.4 1.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+      <span>{displayTime}</span>
+      <span className="text-white/30" aria-hidden="true">|</span>
+      <svg width="11" height="13" viewBox="0 0 12 14" aria-hidden="true" className="text-gold">
+        <path d="M6 1.5a1.8 1.8 0 0 0-1.8 1.8v4.1a3.4 3.4 0 1 0 3.6 0V3.3A1.8 1.8 0 0 0 6 1.5z" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <circle cx="6" cy="10.2" r="1.6" fill="currentColor" />
+      </svg>
+      <span>{displayTemp}</span>
+    </span>
+  );
+}
 
 /* ================= Login modal ================= */
 export function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -117,6 +174,9 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
             {t("govtNp")} · {t("govtEn")} — {t("ministry")}
           </span>
 
+          {/* live clock + temperature */}
+          <ClockTempWidget />
+
           {/* sync status */}
           <span
             className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${sync.online ? "bg-pine/20 text-[#7fe0bd]" : "bg-gold/20 text-gold"}`}
@@ -169,11 +229,16 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
       {/* masthead identity */}
       <div className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
-          <Emblem size={62} />
           <div className="min-w-0">
             <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-crimson">{t("ministry")}</p>
-            <p className="text-sm font-bold text-navy">{t("dept")}</p>
-            <h1 className="font-display text-[1.5rem] leading-tight text-navy-dark sm:text-[2rem]">{t("portal")}</h1>
+            <h1 className="font-display text-[1.5rem] leading-tight text-navy-dark sm:text-[2rem]">
+              {lang === "np" ? "आन्तरिक राजस्व कार्यालय कोटेश्वर" : "Inland Revenue Office Koteshwor"}
+            </h1>
+            <p className="text-sm font-semibold text-navy/80">
+              {lang === "np" ? "Inland Revenue Office Koteshwor" : "आन्तरिक राजस्व कार्यालय कोटेश्वर"}
+              <span className="mx-2 text-crimson" aria-hidden="true">·</span>
+              {t("portal")}
+            </p>
           </div>
           <p className="ml-auto hidden max-w-[240px] text-right text-xs font-medium leading-snug text-ink-soft lg:block">
             {t("tagline")}
@@ -191,7 +256,7 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
           </nav>
           <div className="flex items-center gap-2 px-2 py-1.5">
             <span className="hidden rounded bg-navy-deep/30 px-2.5 py-1 text-xs font-bold sm:inline">
-              {t("fiscal_year")}: {lang === "np" ? fmtInt(2081, lang) + "/८२" : "2081/82"}
+              {lang === "np" ? "आ.व. " + toNpDigits(CURRENT_FY) : "FY " + CURRENT_FY}
             </span>
             <button
               onClick={() => setBoardOpen(true)}

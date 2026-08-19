@@ -188,8 +188,8 @@ export const STRINGS = {
 
   // notices ticker
   notice1: {
-    en: "FY 2081/82 revenue collection crosses 60% of annual target — thank you, taxpayers of Nepal.",
-    np: "आ.व. २०८१/८२ को राजस्व संकलन वार्षिक लक्ष्यको ६०% नाघ्यो — करदाताहरूलाई धन्यवाद।",
+    en: "FY 2082/083 revenue collection crosses 60% of annual target — thank you, taxpayers of Nepal.",
+    np: "आ.व. २०८२/०८३ को राजस्व संकलन वार्षिक लक्ष्यको ६०% नाघ्यो — करदाताहरूलाई धन्यवाद।",
   },
   notice2: {
     en: "File your income tax returns before the end of Ashadh — avoid late fees.",
