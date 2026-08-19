@@ -145,7 +145,7 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
   const { t, lang, setLang, user, logout, sync, fontStep, setFontStep, setBoardOpen } = useApp();
   const [loginOpen, setLoginOpen] = useState(false);
 
-  const tabBtn = (id: Tab, label: string, locked: boolean) => (
+  const tabBtn = (id: Tab, label: string) => (
     <button
       key={id}
       onClick={() => setTab(id)}
@@ -154,12 +154,6 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
         tab === id ? "bg-navy-deep/25 text-white" : "text-white/85 hover:bg-navy-deep/15 hover:text-white"
       }`}
     >
-      {locked && (
-        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-          <rect x="3" y="7" width="10" height="7" rx="1.4" fill="currentColor" />
-          <path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        </svg>
-      )}
       {label}
       {tab === id && <span className="absolute inset-x-0 bottom-0 h-[3px] bg-white" aria-hidden="true" />}
     </button>
@@ -251,8 +245,8 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
       <div className="bg-crimson text-white shadow-md">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center px-2 sm:px-4">
           <nav className="flex flex-1 flex-wrap items-center" aria-label="Main">
-            {tabBtn("dashboard", t("nav_dashboard"), false)}
-            {tabBtn("import", t("nav_import"), user?.role !== "admin")}
+            {tabBtn("dashboard", t("nav_dashboard"))}
+            {tabBtn("import", t("nav_import"))}
           </nav>
           <div className="flex items-center gap-2 px-2 py-1.5">
             <span className="hidden rounded bg-navy-deep/30 px-2.5 py-1 text-xs font-bold sm:inline">
@@ -268,32 +262,6 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
               </svg>
               {t("board_mode")}
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* notices ticker */}
-      <div className="overflow-hidden border-b-2 border-navy-dark bg-navy text-white" aria-label="Notices">
-        <div className="flex items-center">
-          <span className="z-10 flex shrink-0 items-center gap-2 bg-crimson px-3 py-2 text-xs font-extrabold uppercase tracking-wider sm:px-4">
-            <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2 6v4h3l5 3V3L5 6H2z" fill="currentColor" />
-              <path d="M12 5.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-            {lang === "np" ? "सूचना" : "Notice"}
-          </span>
-          <div className="ticker-track py-2 pl-6 text-sm font-semibold text-white/95">
-            {[0, 1].map((dup) => (
-              <span key={dup} className="flex items-center" aria-hidden={dup === 1}>
-                {(["notice1", "notice2", "notice3", "notice4"] as const).map((k, i) => (
-                  <span key={k} className="flex items-center">
-                    <span className="px-5">{t(k)}</span>
-                    <span className="text-gold" aria-hidden="true">✦</span>
-                    {i === 3 && dup === 0 && <span className="w-5" />}
-                  </span>
-                ))}
-              </span>
-            ))}
           </div>
         </div>
       </div>

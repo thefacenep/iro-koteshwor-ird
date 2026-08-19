@@ -28,6 +28,12 @@ interface SyncState {
   lastSync: number | null;
 }
 
+export interface OfficeMeta {
+  file: string;
+  ts: number;
+  rows: number;
+}
+
 interface AppStore {
   lang: Lang;
   setLang: (l: Lang) => void;
@@ -37,6 +43,10 @@ interface AppStore {
   logout: () => void;
   records: RevenueRecord[];
   addRecords: (recs: RevenueRecord[]) => void;
+  officeActive: boolean;
+  officeMeta: OfficeMeta | null;
+  setOfficeData: (recs: RevenueRecord[], file: string) => void;
+  clearOfficeData: () => void;
   logs: LogEntry[];
   addLogs: (l: LogEntry[]) => void;
   sync: SyncState;
@@ -84,7 +94,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }));
   const toastId = useRef(0);
 
-  const records = useMemo(() => [...generateSeed(), ...imported], [imported]);
+  /* ---- office dataset: Inland Revenue Office Koteshwor ---- */
+  const [officeRecords, setOfficeRecordsState] = useState<RevenueRecord[]>(() => load<RevenueRecord[]>("np-rev-office-v1", []));
+  const [officeMeta, setOfficeMetaState] = useState<OfficeMeta | null>(() => load<OfficeMeta | null>("np-rev-office-meta-v1", null));
+
+  const nationalRecords = useMemo(() => [...generateSeed(), ...imported], [imported]);
+  const officeActive = officeRecords.length > 0;
+  /* the records every dashboard / chart / display board consumes —
+     office data takes over immediately after a successful upload */
+  const records = useMemo(
+    () => (officeActive ? officeRecords : nationalRecords),
+    [officeActive, officeRecords, nationalRecords]
+  );
+
+  const setOfficeData = useCallback((recs: RevenueRecord[], file: string) => {
+    setOfficeRecordsState(recs);
+    const meta: OfficeMeta = { file, ts: Date.now(), rows: recs.length };
+    setOfficeMetaState(meta);
+    save("np-rev-office-v1", recs);
+    save("np-rev-office-meta-v1", meta);
+  }, []);
+
+  const clearOfficeData = useCallback(() => {
+    setOfficeRecordsState([]);
+    setOfficeMetaState(null);
+    save("np-rev-office-v1", []);
+    save("np-rev-office-meta-v1", null);
+  }, []);
 
   /* language */
   const setLang = useCallback((l: Lang) => {
@@ -137,7 +173,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!recs.length) return;
       setImported((prev) => {
         const next = [...prev, ...recs];
-        save("np-rev-imports", next);
+        save("np-rev-imports-v2", next);
         return next;
       });
       setSync((s) => {
@@ -154,7 +190,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!entries.length) return;
     setLogs((prev) => {
       const next = [...prev, ...entries].slice(-400);
-      save("np-rev-logs", next);
+      save("np-rev-logs-v2", next);
       return next;
     });
   }, []);
@@ -220,6 +256,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     logout,
     records,
     addRecords,
+    officeActive,
+    officeMeta,
+    setOfficeData,
+    clearOfficeData,
     logs,
     addLogs,
     sync,

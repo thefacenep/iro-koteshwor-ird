@@ -7,7 +7,7 @@ import { ChartCard, DonutChart, GroupedBarChart, StackedBarChart, TrendLineChart
 import { TrendTable } from "./TrendTable";
 
 export function Dashboard() {
-  const { t, lang, records } = useApp();
+  const { t, lang, records, officeActive, officeMeta, clearOfficeData, notify } = useApp();
 
   const updated = useMemo(() => {
     const imported = records.filter((r) => r.importedAt).map((r) => r.importedAt as number);
@@ -16,9 +16,38 @@ export function Dashboard() {
 
   return (
     <div className="space-y-10">
+      {/* live office dataset banner (Koteshwor upload) */}
+      {officeActive && officeMeta && (
+        <Reveal>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border-2 border-pine/50 bg-[#e9f6f0] px-5 py-3.5 shadow-sm">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pine text-white">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4.5 12.5l5 5L19.5 7" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <p className="font-display text-[1.05rem] leading-tight text-[#0b4a3c]">{t("office_data_active")}</p>
+              <p className="truncate text-xs font-semibold text-[#0b4a3c]/70">
+                {t("office_data_sub")} · {officeMeta.file} · {fmtDateTime(officeMeta.ts, lang)}
+              </p>
+            </div>
+            <button
+              onClick={() => { clearOfficeData(); notify(t("national_restored")); }}
+              className="touch-target ml-auto rounded-md border-2 border-pine/60 px-4 py-1.5 text-xs font-bold text-[#0b4a3c] transition-colors hover:bg-pine hover:text-white"
+            >
+              ↺ {t("restore_national")}
+            </button>
+          </div>
+        </Reveal>
+      )}
+
       {/* intro band */}
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <SectionHead kicker={t("section_overview")} title={t("portal")} sub={t("tagline")} />
+        <SectionHead
+          kicker={t("section_overview")}
+          title={officeActive ? t("office_name") : t("portal")}
+          sub={officeActive ? undefined : t("tagline")}
+        />
         <Reveal delay={120}>
           <p className="flex items-center gap-2 rounded-md border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink-soft shadow-sm">
             <span className="live-dot h-2 w-2 rounded-full bg-pine" aria-hidden="true" />

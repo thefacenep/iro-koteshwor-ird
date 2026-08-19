@@ -244,6 +244,196 @@ export async function parseFile(file: File, existing: RevenueRecord[]): Promise<
   return validateRows(aoa as unknown[][], file.name, existing);
 }
 
+/* ============ Office dataset (Inland Revenue Office Koteshwor) ============
+   Target & collection sheets: month + collected are required, target and
+   category are optional. Without a category column every row is treated as
+   the office total; without a target the target defaults to the collected
+   figure so achievement stays computable. */
+export function validateOfficeRows(aoa: unknown[][], fileName: string): ImportResult {
+  const records: RevenueRecord[] = [];
+  const logs: LogEntry[] = [];
+  const preview: PreviewRow[] = [];
+  let success = 0;
+  let errors = 0;
+  let warnings = 0;
+  const now = Date.now();
+  let seq = 0;
+
+  const pushLog = (level: LogLevel, msg: { en: string; np: string }, row?: number, detail?: string) => {
+    logs.push({ id: `olog-${now}-${seq++}`, ts: now + seq, level, file: fileName, row, msg, detail });
+  };
+
+  if (aoa.length < 2) {
+    pushLog("error", { en: "Could not read file", np: "फाइल पढ्न सकिएन" }, undefined, "empty sheet");
+    return { records, logs, preview, summary: { success, errors: 1, warnings, rows: 0 } };
+  }
+
+  const headers = aoa[0].map((h) => String(h ?? ""));
+  const cMonth = findCol(headers, [/month/, /mahina/, /महिना/]);
+  const cColl = findCol(headers, [/collect/, /revenue/, /amount/, /sankalan/, /संकलन/]);
+  const cTarget = findCol(headers, [/target/, /laksya/, /लक्ष्य/]);
+  const cCat = findCol(headers, [/category/, /head/, /shirshak/, /शीर्षक/]);
+  const cFy = findCol(headers, [/fy/, /fiscal/, /^year/, /आ\.?व\./]);
+
+  if (cMonth === -1 || cColl === -1) {
+    pushLog(
+      "error",
+      { en: "Missing required columns", np: "आवश्यक स्तम्भ छैनन्" },
+      1,
+      "need: month, collected (target & category optional)"
+    );
+    return { records, logs, preview, summary: { success, errors: 1, warnings, rows: 0 } };
+  }
+
+  pushLog(
+    "info",
+    { en: "File parsed successfully", np: "फाइल सफलतापूर्वक पढियो" },
+    undefined,
+    `${aoa.length - 1} rows found · IRO Koteshwor`
+  );
+
+  for (let i = 1; i < aoa.length; i++) {
+    const r = aoa[i];
+    if (!r || r.every((c) => c === null || c === undefined || String(c).trim() === "")) continue;
+    const rowNo = i + 1;
+    const month = parseMonth(r[cMonth]);
+    const category = cCat === -1 ? "other" : parseCategory(r[cCat]) ?? "other";
+    const collected = parseAmount(r[cColl]);
+    const targetRaw = cTarget === -1 ? null : parseAmount(r[cTarget]);
+    const fyRaw = cFy === -1 ? null : String(r[cFy] ?? "").trim();
+
+    const msgMap = {
+      month: { en: "Invalid month (use 1–12 or BS month name)", np: "अमान्य महिना (१–१२ वा नेपाली महिना नाम प्रयोग गर्नुहोस्)" },
+      numeric: { en: "Amount must be a number", np: "रकम अङ्कमा हुनुपर्छ" },
+      negative: { en: "Amount cannot be negative", np: "रकम ऋणात्मक हुन सक्दैन" },
+    } as const;
+    type ErrKey = keyof typeof msgMap;
+    let errKey: ErrKey | null = null;
+    let errDetail = "";
+
+    if (month === null) { errKey = "month"; errDetail = `month="${r[cMonth]}"`; }
+    else if (collected === null) { errKey = "numeric"; errDetail = `collected="${r[cColl]}"`; }
+    else if (collected < 0) { errKey = "negative"; errDetail = `collected=${collected}`; }
+
+    if (errKey) {
+      errors++;
+      pushLog("error", msgMap[errKey], rowNo, errDetail);
+      preview.push({
+        row: rowNo,
+        month: String(r[cMonth] ?? "—"),
+        category: String(r[cCat] ?? "—"),
+        collected: String(r[cColl] ?? "—"),
+        status: "error",
+        note: msgMap[errKey],
+      });
+      continue;
+    }
+
+    const mon = month as number;
+    const coll = round1(collected as number);
+    const target = targetRaw !== null && targetRaw > 0 ? round1(targetRaw) : coll;
+    const prev = round1(coll / 1.14);
+    const fy = fyRaw && /^\d{2,4}[/\-]\d{2}$/.test(npToAscii(fyRaw))
+      ? npToAscii(fyRaw).replace("-", "/")
+      : CURRENT_FY;
+
+    if (cCat !== -1 && parseCategory(r[cCat]) === null) {
+      warnings++;
+      pushLog(
+        "warning",
+        { en: "Unknown tax category — filed under Others", np: "अज्ञात कर शीर्षक — अन्य अन्तर्गत राखियो" },
+        rowNo,
+        `category="${r[cCat]}"`
+      );
+      preview.push({ row: rowNo, month: MONTHS[mon].en, category, collected: String(coll), status: "warning", note: { en: "Filed under Others", np: "अन्य अन्तर्गत राखियो" } });
+    } else {
+      success++;
+      pushLog("success", { en: "Row accepted", np: "पङ्क्ति स्वीकृत" }, rowNo, `${MONTHS[mon].en} / ${category} = ${coll}`);
+      preview.push({ row: rowNo, month: MONTHS[mon].en, category, collected: String(coll), status: "success", note: null });
+    }
+
+    records.push({
+      id: `office-${now}-${rowNo}`,
+      fy,
+      month: mon,
+      category,
+      collected: coll,
+      target,
+      prevCollected: prev,
+      source: "import",
+      importedAt: now,
+    });
+  }
+
+  pushLog(
+    "info",
+    { en: "Import session finished", np: "आयात सत्र समाप्त भयो" },
+    undefined,
+    `${success} ok · ${errors} failed · ${warnings} warnings`
+  );
+
+  return { records, logs, preview, summary: { success, errors, warnings, rows: aoa.length - 1 } };
+}
+
+/** Parse an uploaded office .xlsx / .xls / .csv target & collection sheet */
+export async function parseOfficeFile(file: File): Promise<ImportResult> {
+  const XLSX = await import("xlsx");
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null });
+  return validateOfficeRows(aoa as unknown[][], file.name);
+}
+
+/** Koteshwor demo sheet — 12 BS months × key tax heads, plus two bad rows for the log */
+export function demoOfficeBatch(): ImportResult {
+  const aoa: unknown[][] = [
+    ["fy", "month", "category", "target", "collected"],
+    [CURRENT_FY, "श्रावण", "Income Tax", "3.4", "2.9"],
+    [CURRENT_FY, "श्रावण", "Value Added Tax", "2.2", "1.9"],
+    [CURRENT_FY, "श्रावण", "Excise Duty", "0.8", "0.7"],
+    [CURRENT_FY, "भदौ", "Income Tax", "3.4", "3.1"],
+    [CURRENT_FY, "भदौ", "Value Added Tax", "2.2", "2.1"],
+    [CURRENT_FY, "भदौ", "Excise Duty", "0.8", "0.8"],
+    [CURRENT_FY, "असोज", "Income Tax", "3.6", "3.4"],
+    [CURRENT_FY, "असोज", "Value Added Tax", "2.4", "2.5"],
+    [CURRENT_FY, "असोज", "Other Taxes", "0.5", "0.4"],
+    [CURRENT_FY, "कात्तिक", "Income Tax", "3.6", "3.7"],
+    [CURRENT_FY, "कात्तिक", "Value Added Tax", "2.4", "2.3"],
+    [CURRENT_FY, "कात्तिक", "Excise Duty", "0.9", "1.0"],
+    [CURRENT_FY, "मंसिर", "Income Tax", "3.8", "3.5"],
+    [CURRENT_FY, "मंसिर", "Value Added Tax", "2.5", "2.6"],
+    [CURRENT_FY, "पुष", "Income Tax", "3.8", "4.0"],
+    [CURRENT_FY, "पुष", "Value Added Tax", "2.5", "2.7"],
+    [CURRENT_FY, "पुष", "Other Taxes", "0.5", "0.6"],
+    [CURRENT_FY, "माघ", "Income Tax", "4.0", "3.8"],
+    [CURRENT_FY, "माघ", "Value Added Tax", "2.6", "2.8"],
+    [CURRENT_FY, "माघ", "Property Tax Desk", "0.3", "0.3"],
+    [CURRENT_FY, "फागुन", "Income Tax", "4.0", "4.2"],
+    [CURRENT_FY, "फागुन", "Value Added Tax", "2.6", "2.9"],
+    [CURRENT_FY, "फागुन", "Excise Duty", "1.0", "N/A"],
+    [CURRENT_FY, "13", "Income Tax", "4.2", "3.9"],
+    [CURRENT_FY, "चैत", "Income Tax", "4.4", "4.6"],
+    [CURRENT_FY, "चैत", "Value Added Tax", "2.8", "3.0"],
+    [CURRENT_FY, "चैत", "Excise Duty", "1.0", "1.1"],
+    [CURRENT_FY, "वैशाख", "Income Tax", "4.6", "4.5"],
+    [CURRENT_FY, "वैशाख", "Value Added Tax", "2.9", "3.1"],
+    [CURRENT_FY, "जेठ", "Income Tax", "5.0", "5.4"],
+    [CURRENT_FY, "जेठ", "Value Added Tax", "3.2", "3.5"],
+    [CURRENT_FY, "जेठ", "Excise Duty", "1.1", "-0.4"],
+    [CURRENT_FY, "असार", "Income Tax", "6.0", "6.8"],
+    [CURRENT_FY, "असार", "Value Added Tax", "3.8", "4.3"],
+    [CURRENT_FY, "असार", "Excise Duty", "1.3", "1.5"],
+    [CURRENT_FY, "असार", "Other Taxes", "0.7", "0.8"],
+  ];
+  return validateOfficeRows(aoa, "koteshwor_target_collection_2082-83.xlsx");
+}
+
+export const OFFICE_TEMPLATE_CSV = `fy,month,category,target,collected
+${CURRENT_FY},Shrawan,Income Tax,3.4,2.9
+${CURRENT_FY},Shrawan,Value Added Tax,2.2,1.9
+${CURRENT_FY},Bhada,Income Tax,3.4,3.1`;
+
 /** Simulated batch containing deliberate problems so the error log can be demonstrated */
 export function demoBatch(existing: RevenueRecord[]): ImportResult {
   const aoa: unknown[][] = [

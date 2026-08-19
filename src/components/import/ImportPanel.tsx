@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CATEGORIES, CURRENT_FY, MONTHS } from "../../data/seed";
-import { downloadFile, fmtDateTime, fmtInt, fmtTime, toCSV } from "../../lib/format";
-import { demoBatch, parseFile, TEMPLATE_CSV, type ImportResult, type LogEntry, type LogLevel, type PreviewRow } from "../../lib/importer";
+import { CATEGORIES, CURRENT_FY, MONTHS, totals } from "../../data/seed";
+import { downloadFile, fmtArba, fmtDateTime, fmtInt, fmtTime, toCSV } from "../../lib/format";
+import {
+  demoOfficeBatch,
+  OFFICE_TEMPLATE_CSV,
+  parseOfficeFile,
+  type ImportResult,
+  type LogEntry,
+  type LogLevel,
+  type PreviewRow,
+} from "../../lib/importer";
 import { useApp } from "../../lib/store";
 import { Reveal, SectionHead } from "../ui";
 
@@ -11,16 +19,9 @@ const LEVEL_COLOR: Record<LogLevel, string> = {
   warning: "text-[#f4b942]",
   info: "text-[#9db2d4]",
 };
-const LEVEL_BG: Record<LogLevel, string> = {
-  success: "bg-[#7fe0bd]",
-  error: "bg-[#ff9eab]",
-  warning: "bg-[#f4b942]",
-  info: "bg-[#9db2d4]",
-};
 
 export function ImportPanel() {
-  const app = useApp();
-  const { t, lang, user, records, logs, addLogs, addRecords, sync, syncNow, notify } = app;
+  const { t, lang, records, logs, addLogs, setOfficeData, clearOfficeData, officeActive, officeMeta, sync, syncNow, notify, setBoardOpen } = useApp();
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<PreviewRow[] | null>(null);
@@ -30,8 +31,6 @@ export function ImportPanel() {
   const [statusFilter, setStatusFilter] = useState<"all" | LogLevel>("all");
   const logBoxRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
-
-  const isAdmin = user?.role === "admin";
 
   useEffect(() => () => { if (timerRef.current) window.clearTimeout(timerRef.current); }, []);
 
@@ -57,7 +56,7 @@ export function ImportPanel() {
         }
         addLogs(entries.slice(i, i + 2));
         i += 2;
-        timerRef.current = window.setTimeout(step, 85);
+        timerRef.current = window.setTimeout(step, 70);
       };
       step();
     },
@@ -70,11 +69,16 @@ export function ImportPanel() {
       setLastFile(fileName);
       streamLogs(res.logs, () => {
         setBusy(false);
-        if (res.records.length) addRecords(res.records);
-        notify(`${t("import_done")} — ${fmtInt(res.summary.success, lang)} ✓ · ${fmtInt(res.summary.errors, lang)} ✗`);
+        if (res.records.length) {
+          /* route straight into global state → dashboard + display board refresh instantly */
+          setOfficeData(res.records, fileName);
+          notify(`${t("upload_success_title")} — ${fmtInt(res.records.length, lang)} ${t("routed_rows")} ✓`);
+        } else {
+          notify(lang === "np" ? "कुनै मान्य पङ्क्ति भेटिएन — लग हेर्नुहोस्" : "No valid rows found — check the log below", "warn");
+        }
       });
     },
-    [addRecords, lang, notify, streamLogs, t]
+    [lang, notify, setOfficeData, streamLogs, t]
   );
 
   const handleFile = useCallback(
@@ -90,24 +94,28 @@ export function ImportPanel() {
       }
       setBusy(true);
       try {
-        const res = await parseFile(file, records);
+        const res = await parseOfficeFile(file);
         applyResult(res, file.name);
       } catch {
         addLogs([
           { id: `log-err-${Date.now()}`, ts: Date.now(), level: "error", file: file.name, msg: { en: "Could not read file", np: "फाइल पढ्न सकिएन" } },
         ]);
         setBusy(false);
+        notify(lang === "np" ? "फाइल पढ्न सकिएन" : "Could not read file", "warn");
       }
     },
-    [addLogs, applyResult, busy, lang, notify, records]
+    [addLogs, applyResult, busy, lang, notify]
   );
 
   const runDemo = useCallback(() => {
     if (busy) return;
     setBusy(true);
-    const res = demoBatch(records);
-    applyResult(res, "demo_batch_2082-02-14.xlsx");
-  }, [applyResult, busy, records]);
+    const res = demoOfficeBatch();
+    applyResult(res, "koteshwor_target_collection_2082-83.xlsx");
+  }, [applyResult, busy]);
+
+  /* ---------- office totals for the success card ---------- */
+  const officeTotals = useMemo(() => (officeActive ? totals(records) : null), [officeActive, records]);
 
   /* ---------- stats derived from logs ---------- */
   const stats = useMemo(() => {
@@ -157,33 +165,11 @@ export function ImportPanel() {
     notify(t("export_done"));
   };
 
-  /* ================= locked state ================= */
-  if (!isAdmin) {
-    return (
-      <div className="space-y-10">
-        <SectionHead kicker={t("nav_import")} title={t("import_title")} sub={t("import_sub")} />
-        <Reveal>
-          <div className="mx-auto max-w-xl rounded-lg border-2 border-dashed border-line bg-card p-10 text-center shadow-sm">
-            <svg width="64" height="64" viewBox="0 0 64 64" className="mx-auto" aria-hidden="true">
-              <rect x="14" y="28" width="36" height="26" rx="5" fill="#0b2260" />
-              <path d="M22 28v-7a10 10 0 0 1 20 0v7" fill="none" stroke="#c8102e" strokeWidth="5" strokeLinecap="round" />
-              <circle cx="32" cy="40" r="4.5" fill="#f4b942" />
-              <path d="M32 43v6" stroke="#f4b942" strokeWidth="4" strokeLinecap="round" />
-            </svg>
-            <h3 className="mt-4 font-display text-2xl text-navy-dark">{t("access_locked")}</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-soft">{t("access_locked_desc")}</p>
-            <p className="mt-4 text-xs font-bold uppercase tracking-wider text-crimson">{t("secure_note")}</p>
-          </div>
-        </Reveal>
-      </div>
-    );
-  }
-
-  /* ================= admin view ================= */
   return (
     <div className="space-y-10">
+      {/* header row */}
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <SectionHead kicker={t("nav_import")} title={t("import_title")} sub={t("import_sub")} />
+        <SectionHead kicker={t("office_kicker")} title={t("office_name")} sub={t("import_sub")} />
         <Reveal delay={120}>
           <div className="flex items-center gap-3">
             <span className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-bold ${sync.pending > 0 ? "border-gold/60 bg-[#fdf3d7] text-[#7a5a00]" : "border-line bg-card text-ink-soft"}`}>
@@ -207,69 +193,146 @@ export function ImportPanel() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-12">
-        {/* ---------- left: upload ---------- */}
-        <Reveal className="xl:col-span-5">
-          <div className="lift rounded-lg border border-line bg-card p-6 shadow-sm">
-            <h3 className="font-display text-[1.25rem] text-navy-dark">{t("upload_title")}</h3>
-            <label
-              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragging(false);
-                const f = e.dataTransfer.files?.[0];
-                if (f) void handleFile(f);
-              }}
-              className={`mt-4 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-all ${
-                dragging ? "border-crimson bg-crimson-soft scale-[1.01]" : "border-line bg-paper hover:border-navy hover:bg-navy/5"
-              }`}
-            >
-              <input type="file" accept=".xlsx,.xls,.csv" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); e.target.value = ""; }} disabled={busy} />
-              {busy ? (
-                <>
-                  <svg className="spin-slow" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
-                    <circle cx="20" cy="20" r="16" fill="none" stroke="#d8dfec" strokeWidth="5" />
-                    <path d="M20 4a16 16 0 0 1 16 16" fill="none" stroke="#c8102e" strokeWidth="5" strokeLinecap="round" />
-                  </svg>
-                  <p className="text-sm font-bold text-crimson">{t("processing")}</p>
-                </>
-              ) : (
-                <>
-                  <svg width="42" height="42" viewBox="0 0 48 48" aria-hidden="true">
-                    <path d="M12 4h17l9 9v29a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="#0b2260" />
-                    <path d="M29 4v9h9" fill="#2c4488" />
-                    <path d="M24 34V20m0 0l-6 6m6-6l6 6" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                  </svg>
+        {/* ---------- left: upload + success ---------- */}
+        <div className="space-y-6 xl:col-span-5">
+          <Reveal>
+            <div className="lift rounded-lg border border-line bg-card p-6 shadow-sm">
+              {/* ===== drag & drop Excel upload zone ===== */}
+              <label
+                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) void handleFile(f);
+                }}
+                className={`group flex cursor-pointer flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-all duration-200 ${
+                  dragging ? "scale-[1.015] border-crimson bg-crimson-soft shadow-lg" : "border-navy/30 bg-white hover:border-crimson hover:bg-crimson-soft/40"
+                }`}
+              >
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  className="sr-only"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); e.target.value = ""; }}
+                  disabled={busy}
+                  aria-label={t("upload_main_title")}
+                />
+
+                {busy ? (
+                  <>
+                    <svg className="spin-slow" width="52" height="52" viewBox="0 0 40 40" aria-hidden="true">
+                      <circle cx="20" cy="20" r="16" fill="none" stroke="#d8dfec" strokeWidth="5" />
+                      <path d="M20 4a16 16 0 0 1 16 16" fill="none" stroke="#c8102e" strokeWidth="5" strokeLinecap="round" />
+                    </svg>
+                    <p className="text-base font-bold text-crimson">{t("processing")}</p>
+                  </>
+                ) : (
+                  <>
+                    {/* cloud upload + excel mark */}
+                    <span className="relative">
+                      <svg width="76" height="62" viewBox="0 0 76 62" aria-hidden="true" className="transition-transform duration-200 group-hover:-translate-y-1">
+                        <path d="M20 50a14 14 0 0 1-2.2-27.8A18 18 0 0 1 53 18.6 13 13 0 0 1 58 44" fill="none" stroke="#003893" strokeWidth="4.5" strokeLinecap="round" />
+                        <path d="M38 56V30m0 0l-9 9m9-9l9 9" fill="none" stroke="#c8102e" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="absolute -bottom-1 -right-3 flex h-8 w-8 items-center justify-center rounded-md bg-pine font-display text-[0.72rem] font-bold text-white shadow-md">
+                        XLS
+                      </span>
+                    </span>
+                    <span>
+                      <span className="block font-display text-[1.3rem] leading-snug text-navy-dark">{t("upload_main_title")}</span>
+                      <span className="mt-1.5 block max-w-sm text-sm font-medium leading-relaxed text-ink-soft">{t("upload_main_sub")}</span>
+                    </span>
+                    <span className="mt-1 inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-crimson to-crimson-dark px-7 py-2.5 text-base font-bold text-white shadow-md transition-all duration-200 group-hover:shadow-lg group-hover:brightness-110">
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M2 11v2.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V11M8 1.5v8M8 1.5L4.8 4.7M8 1.5l3.2 3.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      {t("browse_files")}
+                    </span>
+                    <span className="text-xs font-medium text-ink-soft">
+                      {t("upload_excel_note")} · ≤ 5 MB
+                    </span>
+                  </>
+                )}
+              </label>
+
+              {/* expected columns + actions */}
+              <div className="mt-4 rounded-md bg-paper p-3.5">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-navy">{t("expected_cols")}</p>
+                <p className="mt-1 font-mono text-[12px] font-semibold text-ink">month · target · collected · category (optional)</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">{t("office_cols_note")}</p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button onClick={() => { downloadFile("koteshwor-template.csv", OFFICE_TEMPLATE_CSV, "text/csv"); notify(t("export_done")); }} className="touch-target rounded-md border-2 border-navy px-4 py-2 text-sm font-bold text-navy transition-colors hover:bg-navy hover:text-white">
+                  ⬇ {t("template_download")}
+                </button>
+                <button onClick={runDemo} disabled={busy} className="touch-target rounded-md border-2 border-line px-4 py-2 text-sm font-bold text-ink-soft transition-colors hover:border-crimson hover:text-crimson disabled:opacity-50">
+                  ▶ {t("office_demo")}
+                </button>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* ===== success card — live office dataset ===== */}
+          {officeActive && officeMeta && officeTotals && (
+            <Reveal>
+              <div className="overflow-hidden rounded-lg border-2 border-pine/50 bg-card shadow-md">
+                <div className="flex items-center gap-4 bg-pine px-5 py-4 text-white">
+                  <span className="check-pop flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15 ring-4 ring-white/20">
+                    <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4.5 12.5l5 5L19.5 7" fill="none" stroke="#ffffff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
                   <div>
-                    <p className="text-sm font-bold text-ink">{t("drop_hint")}</p>
-                    <span className="mt-2 inline-block rounded-md bg-crimson px-5 py-2 text-sm font-bold text-white">{t("browse")}</span>
+                    <p className="font-display text-xl leading-tight">{t("upload_success_title")}</p>
+                    <p className="text-sm font-semibold text-white/85">{t("upload_success_msg")}</p>
                   </div>
-                  <p className="text-xs font-medium text-ink-soft">{t("accepted")}</p>
-                </>
-              )}
-            </label>
+                </div>
+                <div className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
+                  <div className="bg-card p-3.5">
+                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("rows")}</p>
+                    <p className="mt-1 font-display text-2xl tabular-nums text-navy-dark">{fmtInt(officeMeta.rows, lang)}</p>
+                  </div>
+                  <div className="bg-card p-3.5">
+                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("target")}</p>
+                    <p className="mt-1 font-display text-2xl tabular-nums text-navy-dark">{fmtArba(officeTotals.target, lang)}</p>
+                  </div>
+                  <div className="bg-card p-3.5">
+                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("collected")}</p>
+                    <p className="mt-1 font-display text-2xl tabular-nums text-pine">{fmtArba(officeTotals.collected, lang)}</p>
+                  </div>
+                  <div className="bg-card p-3.5">
+                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("uploaded_at")}</p>
+                    <p className="mt-1 text-sm font-bold leading-snug text-ink">{fmtDateTime(officeMeta.ts, lang)}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 border-t border-line bg-paper px-5 py-3.5">
+                  <p className="mr-auto max-w-full truncate font-mono text-[11px] font-semibold text-ink-soft" title={officeMeta.file}>
+                    {t("uploaded_file")}: {officeMeta.file}
+                  </p>
+                  <button onClick={() => setBoardOpen(true)} className="touch-target flex items-center gap-2 rounded-md bg-crimson px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-crimson-dark">
+                    <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true">
+                      <rect x="2" y="3" width="16" height="11" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M7 17h6M10 14v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                    {t("open_board")}
+                  </button>
+                  <button
+                    onClick={() => { clearOfficeData(); setPreview(null); setLastFile(null); notify(t("national_restored")); }}
+                    className="touch-target rounded-md border-2 border-line px-4 py-2 text-sm font-bold text-ink-soft transition-colors hover:border-navy hover:text-navy"
+                  >
+                    ↺ {t("restore_national")}
+                  </button>
+                </div>
+              </div>
+            </Reveal>
+          )}
 
-            <div className="mt-4 rounded-md bg-paper p-3.5">
-              <p className="text-xs font-extrabold uppercase tracking-wider text-navy">{t("expected_cols")}</p>
-              <p className="mt-1 font-mono text-[12px] font-semibold text-ink">month · category · collected · target · previous (optional)</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
-                {lang === "np"
-                  ? "महिना (१–१२ वा नेपाली नाम), शीर्षक नेपाली वा English मा, रकम अर्बमा।"
-                  : "Month as 1–12 or BS name, category in Nepali or English, amounts in billions (arba)."}
-              </p>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button onClick={() => { downloadFile("ird-template.csv", TEMPLATE_CSV, "text/csv"); notify(t("export_done")); }} className="touch-target rounded-md border-2 border-navy px-4 py-2 text-sm font-bold text-navy transition-colors hover:bg-navy hover:text-white">
-                ⬇ {t("template_download")}
-              </button>
-              <button onClick={runDemo} disabled={busy} className="touch-target rounded-md border-2 border-line px-4 py-2 text-sm font-bold text-ink-soft transition-colors hover:border-crimson hover:text-crimson disabled:opacity-50">
-                ▶ {t("demo_batch")}
-              </button>
-            </div>
-
-            {/* preview */}
-            <div className="mt-6">
+          {/* ===== row preview ===== */}
+          <Reveal delay={80}>
+            <div className="rounded-lg border border-line bg-card p-6 shadow-sm">
               <h4 className="flex items-center justify-between text-sm font-extrabold text-navy-dark">
                 {t("preview_title")}
                 {lastFile && <span className="max-w-[55%] truncate rounded bg-paper px-2 py-0.5 font-mono text-[11px] font-semibold text-ink-soft" title={lastFile}>{lastFile}</span>}
@@ -308,8 +371,8 @@ export function ImportPanel() {
                 </div>
               )}
             </div>
-          </div>
-        </Reveal>
+          </Reveal>
+        </div>
 
         {/* ---------- right: stats + log ---------- */}
         <div className="space-y-6 xl:col-span-7">

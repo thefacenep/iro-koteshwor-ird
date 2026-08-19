@@ -7,7 +7,7 @@ import { TrendTable } from "./dashboard/TrendTable";
 import { Emblem } from "./ui";
 
 export function BoardMode() {
-  const { t, lang, records, setBoardOpen } = useApp();
+  const { t, lang, records, setBoardOpen, officeActive } = useApp();
   const [slide, setSlide] = useState(0);
   const [clock, setClock] = useState(new Date());
   const reduced = useRef(false);
@@ -38,7 +38,7 @@ export function BoardMode() {
   const clockStr = clock.toLocaleTimeString("en-GB");
 
   const slideTitle = [
-    t("portal"),
+    officeActive ? t("office_name") : t("portal"),
     t("section_monthly"),
     t("section_trend"),
     t("section_share"),
@@ -57,9 +57,10 @@ export function BoardMode() {
       <div className="flex items-center gap-4 bg-navy-deep px-6 py-3 text-white">
         <Emblem size={44} />
         <div className="mr-auto leading-tight">
-          <p className="font-display text-lg sm:text-xl">{t("portal")}</p>
+          <p className="font-display text-lg sm:text-xl">{officeActive ? t("office_name") : t("portal")}</p>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/60">
             {t("dept")} · {t("fiscal_year")} {lang === "np" ? toNpDigits(CURRENT_FY) : CURRENT_FY}
+            {officeActive && <span className="ml-2 rounded bg-pine px-1.5 py-0.5 text-[10px] font-extrabold tracking-normal text-white">LIVE</span>}
           </p>
         </div>
         <span className="hidden rounded-md bg-white/10 px-3 py-1.5 font-mono text-lg font-bold tabular-nums sm:block" aria-label="clock">

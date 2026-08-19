@@ -186,22 +186,39 @@ export const STRINGS = {
   footer_rights: { en: "Inland Revenue Department · Babarmahal, Kathmandu", np: "आन्तरिक राजस्व विभाग · बबरमहल, काठमाडौँ" },
   footer_lang: { en: "Available in नेपाली and English", np: "नेपाली र English मा उपलब्ध" },
 
-  // notices ticker
-  notice1: {
-    en: "FY 2082/083 revenue collection crosses 60% of annual target — thank you, taxpayers of Nepal.",
-    np: "आ.व. २०८२/०८३ को राजस्व संकलन वार्षिक लक्ष्यको ६०% नाघ्यो — करदाताहरूलाई धन्यवाद।",
+  // office (Koteshwor) data upload
+  office_name: { en: "Inland Revenue Office Koteshwor", np: "आन्तरिक राजस्व कार्यालय कोटेश्वर" },
+  office_kicker: { en: "Office Data Console", np: "कार्यालय तथ्याङ्क कन्सोल" },
+  upload_main_title: { en: "Upload Revenue Target & Collection Data", np: "राजस्व लक्ष्य तथा संकलन तथ्याङ्क अपलोड गर्नुहोस्" },
+  upload_main_sub: { en: "Drag and drop your Excel (.xlsx) file here, or click to browse.", np: "आफ्नो एक्सेल (.xlsx) फाइल यहाँ तानेर छोड्नुहोस्, वा क्लिक गरेर छान्नुहोस्।" },
+  browse_files: { en: "Browse Files", np: "फाइल छान्नुहोस्" },
+  upload_excel_note: {
+    en: "Excel workbook (.xlsx / .xls) · parsed automatically with SheetJS",
+    np: "एक्सेल वर्कबुक (.xlsx / .xls) · स्वतः प्रशोधन हुन्छ",
   },
-  notice2: {
-    en: "File your income tax returns before the end of Ashadh — avoid late fees.",
-    np: "असार मसान्तभित्र आयकर विवरण पेस गर्नुहोस् — ढिलाइ दस्तुरबाट बच्नुहोस्।",
+  upload_success_title: { en: "Upload successful", np: "अपलोड सफल भयो" },
+  upload_success_msg: {
+    en: "Your figures are now live on the dashboard and the display board.",
+    np: "तपाईंका आँकडा अब ड्यासबोर्ड र डिस्प्ले बोर्डमा लाइभ छन्।",
   },
-  notice3: {
-    en: "New: pay taxes online from anywhere via connectIPS — no office visit needed.",
-    np: "नयाँ: connectIPS मार्फत जहाँबाट पनि कर तिर्नुहोस् — कार्यालय धाउनु पर्दैन।",
+  routed_rows: { en: "rows routed to display board", np: "पङ्क्ति डिस्प्ले बोर्डमा पठाइयो" },
+  office_data_active: {
+    en: "Displaying office dataset — Inland Revenue Office Koteshwor",
+    np: "कार्यालय तथ्याङ्क देखाइँदै — आन्तरिक राजस्व कार्यालय कोटेश्वर",
   },
-  notice4: {
-    en: "Display boards now live at all 581 taxpayer service offices across 77 districts.",
-    np: "७७ वटै जिल्लाका ५८१ करदाता सेवा कार्यालयमा प्रदर्शन बोर्ड सञ्चालनमा।",
+  office_data_sub: {
+    en: "Uploaded target & collection figures are live on this dashboard and the display board.",
+    np: "अपलोड गरिएका लक्ष्य तथा संकलन आँकडा यो ड्यासबोर्ड र डिस्प्ले बोर्डमा लाइभ छन्।",
+  },
+  restore_national: { en: "Restore national dataset", np: "राष्ट्रिय तथ्याङ्क फर्काउनुहोस्" },
+  national_restored: { en: "National dataset restored", np: "राष्ट्रिय तथ्याङ्क फर्काइयो" },
+  open_board: { en: "Open display board", np: "डिस्प्ले बोर्ड खोल्नुहोस्" },
+  office_demo: { en: "Load demo office sheet", np: "डेमो कार्यालय सिट लोड गर्नुहोस्" },
+  uploaded_file: { en: "Uploaded file", np: "अपलोड फाइल" },
+  uploaded_at: { en: "Uploaded at", np: "अपलोड समय" },
+  office_cols_note: {
+    en: "Columns: month · target · collected · category (optional). Amounts in billions (arba).",
+    np: "स्तम्भहरू: महिना · लक्ष्य · संकलन · शीर्षक (ऐच्छिक)। रकम अर्बमा।",
   },
 
   // misc
