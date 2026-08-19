@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { REAL_OFFICE, type OfficeData } from "../data/office";
 import { generateSeed, type RevenueRecord } from "../data/seed";
 import type { Lang } from "./format";
 import { translate, type TKey } from "./i18n";
@@ -28,12 +29,6 @@ interface SyncState {
   lastSync: number | null;
 }
 
-export interface OfficeMeta {
-  file: string;
-  ts: number;
-  rows: number;
-}
-
 interface AppStore {
   lang: Lang;
   setLang: (l: Lang) => void;
@@ -43,10 +38,10 @@ interface AppStore {
   logout: () => void;
   records: RevenueRecord[];
   addRecords: (recs: RevenueRecord[]) => void;
-  officeActive: boolean;
-  officeMeta: OfficeMeta | null;
-  setOfficeData: (recs: RevenueRecord[], file: string) => void;
-  clearOfficeData: () => void;
+  office: OfficeData;
+  officeModified: boolean;
+  applyOfficeImport: (partial: Partial<OfficeData>, file: string) => void;
+  resetOffice: () => void;
   logs: LogEntry[];
   addLogs: (l: LogEntry[]) => void;
   sync: SyncState;
@@ -94,33 +89,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }));
   const toastId = useRef(0);
 
-  /* ---- office dataset: Inland Revenue Office Koteshwor ---- */
-  const [officeRecords, setOfficeRecordsState] = useState<RevenueRecord[]>(() => load<RevenueRecord[]>("np-rev-office-v1", []));
-  const [officeMeta, setOfficeMetaState] = useState<OfficeMeta | null>(() => load<OfficeMeta | null>("np-rev-office-meta-v1", null));
+  /* ---- office dataset: Inland Revenue Office Koteshwor ----
+     Seeded with the real figures from Book1.xlsx and
+     "Revenue target of each month.xlsx"; uploads merge over the top
+     and the dashboard / display board re-render instantly. */
+  const [office, setOfficeState] = useState<OfficeData>(() => {
+    const stored = load<OfficeData | null>("np-rev-office-v3", null);
+    return stored && Array.isArray(stored.target) && stored.target.length === 12 ? stored : { ...REAL_OFFICE };
+  });
+
+  const applyOfficeImport = useCallback((partial: Partial<OfficeData>, file: string) => {
+    setOfficeState((prev) => {
+      const next: OfficeData = { ...prev, ...partial, file, ts: Date.now() };
+      save("np-rev-office-v3", next);
+      return next;
+    });
+  }, []);
+
+  const resetOffice = useCallback(() => {
+    setOfficeState({ ...REAL_OFFICE });
+    save("np-rev-office-v3", null);
+  }, []);
 
   const nationalRecords = useMemo(() => [...generateSeed(), ...imported], [imported]);
-  const officeActive = officeRecords.length > 0;
-  /* the records every dashboard / chart / display board consumes —
-     office data takes over immediately after a successful upload */
-  const records = useMemo(
-    () => (officeActive ? officeRecords : nationalRecords),
-    [officeActive, officeRecords, nationalRecords]
-  );
-
-  const setOfficeData = useCallback((recs: RevenueRecord[], file: string) => {
-    setOfficeRecordsState(recs);
-    const meta: OfficeMeta = { file, ts: Date.now(), rows: recs.length };
-    setOfficeMetaState(meta);
-    save("np-rev-office-v1", recs);
-    save("np-rev-office-meta-v1", meta);
-  }, []);
-
-  const clearOfficeData = useCallback(() => {
-    setOfficeRecordsState([]);
-    setOfficeMetaState(null);
-    save("np-rev-office-v1", []);
-    save("np-rev-office-meta-v1", null);
-  }, []);
+  const records = nationalRecords;
+  const officeModified = office.file !== REAL_OFFICE.file || office.ts !== 0;
 
   /* language */
   const setLang = useCallback((l: Lang) => {
@@ -256,10 +249,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     logout,
     records,
     addRecords,
-    officeActive,
-    officeMeta,
-    setOfficeData,
-    clearOfficeData,
+    office,
+    officeModified,
+    applyOfficeImport,
+    resetOffice,
     logs,
     addLogs,
     sync,

@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CATEGORIES, CURRENT_FY, MONTHS, totals } from "../../data/seed";
-import { downloadFile, fmtArba, fmtDateTime, fmtInt, fmtTime, toCSV } from "../../lib/format";
-import {
-  demoOfficeBatch,
-  OFFICE_TEMPLATE_CSV,
-  parseOfficeFile,
-  type ImportResult,
-  type LogEntry,
-  type LogLevel,
-  type PreviewRow,
-} from "../../lib/importer";
+import { MONTH_COLS } from "../../data/office";
+import { downloadFile, fmtDateTime, fmtInt, fmtTime, toCSV, toNpDigits } from "../../lib/format";
+import type { LogEntry, LogLevel } from "../../lib/importer";
+import { demoBook1Batch, demoMatrixBatch, parseOfficeFile, type OfficeImportResult } from "../../lib/officeParser";
 import { useApp } from "../../lib/store";
 import { Reveal, SectionHead } from "../ui";
 
@@ -20,11 +13,16 @@ const LEVEL_COLOR: Record<LogLevel, string> = {
   info: "text-[#9db2d4]",
 };
 
+function fmtTh(n: number, lang: "en" | "np", decimals = 0): string {
+  const out = n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return lang === "np" ? toNpDigits(out) : out;
+}
+
 export function ImportPanel() {
-  const { t, lang, records, logs, addLogs, setOfficeData, clearOfficeData, officeActive, officeMeta, sync, syncNow, notify, setBoardOpen } = useApp();
+  const { t, lang, logs, addLogs, applyOfficeImport, office, officeModified, resetOffice, sync, syncNow, notify, setBoardOpen } = useApp();
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState<PreviewRow[] | null>(null);
+  const [lastResult, setLastResult] = useState<OfficeImportResult | null>(null);
   const [lastFile, setLastFile] = useState<string | null>(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -50,13 +48,10 @@ export function ImportPanel() {
       }
       let i = 0;
       const step = () => {
-        if (i >= entries.length) {
-          onDone();
-          return;
-        }
+        if (i >= entries.length) { onDone(); return; }
         addLogs(entries.slice(i, i + 2));
         i += 2;
-        timerRef.current = window.setTimeout(step, 70);
+        timerRef.current = window.setTimeout(step, 85);
       };
       step();
     },
@@ -64,21 +59,23 @@ export function ImportPanel() {
   );
 
   const applyResult = useCallback(
-    (res: ImportResult, fileName: string) => {
-      setPreview(res.preview);
+    (res: OfficeImportResult, fileName: string) => {
+      setLastResult(res);
       setLastFile(fileName);
       streamLogs(res.logs, () => {
         setBusy(false);
-        if (res.records.length) {
-          /* route straight into global state → dashboard + display board refresh instantly */
-          setOfficeData(res.records, fileName);
-          notify(`${t("upload_success_title")} — ${fmtInt(res.records.length, lang)} ${t("routed_rows")} ✓`);
+        if (Object.keys(res.partial).length > 0 && res.summary.errors === 0) {
+          applyOfficeImport(res.partial, fileName);
+          notify(`${t("updated_live")} ✓`);
+        } else if (Object.keys(res.partial).length > 0) {
+          applyOfficeImport(res.partial, fileName);
+          notify(`${t("import_done")} — ${fmtInt(res.summary.ok, lang)} ✓ · ${fmtInt(res.summary.errors, lang)} ✗`, "warn");
         } else {
-          notify(lang === "np" ? "कुनै मान्य पङ्क्ति भेटिएन — लग हेर्नुहोस्" : "No valid rows found — check the log below", "warn");
+          notify(lang === "np" ? "कुनै मान्य पङ्क्ति भेटिएन" : "No valid rows found in the sheet", "warn");
         }
       });
     },
-    [lang, notify, setOfficeData, streamLogs, t]
+    [applyOfficeImport, lang, notify, streamLogs, t]
   );
 
   const handleFile = useCallback(
@@ -97,31 +94,34 @@ export function ImportPanel() {
         const res = await parseOfficeFile(file);
         applyResult(res, file.name);
       } catch {
-        addLogs([
-          { id: `log-err-${Date.now()}`, ts: Date.now(), level: "error", file: file.name, msg: { en: "Could not read file", np: "फाइल पढ्न सकिएन" } },
-        ]);
+        addLogs([{ id: `log-err-${Date.now()}`, ts: Date.now(), level: "error", file: file.name, msg: { en: "Could not read file", np: "फाइल पढ्न सकिएन" } }]);
         setBusy(false);
-        notify(lang === "np" ? "फाइल पढ्न सकिएन" : "Could not read file", "warn");
       }
     },
     [addLogs, applyResult, busy, lang, notify]
   );
 
-  const runDemo = useCallback(() => {
-    if (busy) return;
-    setBusy(true);
-    const res = demoOfficeBatch();
-    applyResult(res, "koteshwor_target_collection_2082-83.xlsx");
-  }, [applyResult, busy]);
-
-  /* ---------- office totals for the success card ---------- */
-  const officeTotals = useMemo(() => (officeActive ? totals(records) : null), [officeActive, records]);
+  const runDemo = useCallback(
+    async (kind: "matrix" | "book1") => {
+      if (busy) return;
+      setBusy(true);
+      const demo = kind === "matrix" ? demoMatrixBatch() : demoBook1Batch();
+      const file = new File([toCSV(demo.aoa as (string | number)[][])], demo.name.replace(/\.xlsx$/, ".csv"), { type: "text/csv" });
+      try {
+        const res = await parseOfficeFile(file);
+        applyResult(res, demo.name);
+      } catch {
+        setBusy(false);
+      }
+    },
+    [applyResult, busy]
+  );
 
   /* ---------- stats derived from logs ---------- */
   const stats = useMemo(() => {
-    const sessions = logs.filter((l) => l.level === "info" && l.detail?.includes("rows found")).length;
+    const sessions = logs.filter((l) => l.level === "info" && l.msg.en === "File parsed successfully").length;
     const success = logs.filter((l) => l.level === "success").length;
-    const failed = logs.filter((l) => l.level === "error" && l.row !== undefined).length;
+    const failed = logs.filter((l) => l.level === "error").length;
     const warnings = logs.filter((l) => l.level === "warning").length;
     return { sessions, success, failed, warnings };
   }, [logs]);
@@ -134,6 +134,27 @@ export function ImportPanel() {
   }, [logs, fromDate, toDate, statusFilter]);
 
   /* ---------- exports ---------- */
+  const exportData = (kind: "csv" | "json") => {
+    if (kind === "json") {
+      downloadFile(`koteshwor-revenue-${Date.now()}.json`, JSON.stringify(office, null, 2), "application/json");
+    } else {
+      const header = ["Series", ...MONTH_COLS.map((m) => m.en), "TOTAL"];
+      const row = (label: string, vals: (number | null)[]) => [
+        label,
+        ...vals.map((v) => (v === null ? "" : v)),
+        vals.reduce<number>((s, v) => s + (v ?? 0), 0),
+      ];
+      const rows: (string | number)[][] = [
+        header,
+        row("Target of 2083/084", office.target),
+        row("Collection of 2082/083", office.collectedPrev),
+        row("Collection of 2083/084", office.collectedCurrent),
+      ];
+      downloadFile(`koteshwor-revenue-${Date.now()}.csv`, toCSV(rows), "text/csv");
+    }
+    notify(t("export_done"));
+  };
+
   const exportLogs = (kind: "csv" | "json") => {
     const data = filtered.map((l) => ({
       time: new Date(l.ts).toISOString(),
@@ -144,32 +165,20 @@ export function ImportPanel() {
       detail: l.detail ?? "",
     }));
     if (kind === "json") {
-      downloadFile(`ird-import-logs-${Date.now()}.json`, JSON.stringify(data, null, 2), "application/json");
+      downloadFile(`koteshwor-import-logs-${Date.now()}.json`, JSON.stringify(data, null, 2), "application/json");
     } else {
       const rows: (string | number)[][] = [["time", "level", "file", "row", "message", "detail"], ...data.map((d) => [d.time, d.level, d.file, d.row, d.message, d.detail])];
-      downloadFile(`ird-import-logs-${Date.now()}.csv`, toCSV(rows), "text/csv");
+      downloadFile(`koteshwor-import-logs-${Date.now()}.csv`, toCSV(rows), "text/csv");
     }
     notify(t("export_done"));
   };
 
-  const exportData = (kind: "csv" | "json") => {
-    const rows: (string | number)[][] = [
-      ["fy", "month", "month_name", "category", "collected_bn", "target_bn", "prev_collected_bn", "source"],
-      ...records.map((r) => [r.fy, r.month + 1, MONTHS[r.month].en, r.category, r.collected, r.target, r.prevCollected, r.source]),
-    ];
-    if (kind === "json") {
-      downloadFile(`ird-revenue-${CURRENT_FY.replace("/", "-")}.json`, JSON.stringify(records, null, 2), "application/json");
-    } else {
-      downloadFile(`ird-revenue-${CURRENT_FY.replace("/", "-")}.csv`, toCSV(rows), "text/csv");
-    }
-    notify(t("export_done"));
-  };
+  const success = lastResult && lastResult.summary.ok > 0;
 
   return (
     <div className="space-y-10">
-      {/* header row */}
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <SectionHead kicker={t("office_kicker")} title={t("office_name")} sub={t("import_sub")} />
+        <SectionHead kicker={t("nav_import")} title={t("import_title")} sub={t("import_sub")} />
         <Reveal delay={120}>
           <div className="flex items-center gap-3">
             <span className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-bold ${sync.pending > 0 ? "border-gold/60 bg-[#fdf3d7] text-[#7a5a00]" : "border-line bg-card text-ink-soft"}`}>
@@ -193,11 +202,10 @@ export function ImportPanel() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-12">
-        {/* ---------- left: upload + success ---------- */}
+        {/* ---------- left: upload ---------- */}
         <div className="space-y-6 xl:col-span-5">
           <Reveal>
             <div className="lift rounded-lg border border-line bg-card p-6 shadow-sm">
-              {/* ===== drag & drop Excel upload zone ===== */}
               <label
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
@@ -207,163 +215,152 @@ export function ImportPanel() {
                   const f = e.dataTransfer.files?.[0];
                   if (f) void handleFile(f);
                 }}
-                className={`group flex cursor-pointer flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-all duration-200 ${
-                  dragging ? "scale-[1.015] border-crimson bg-crimson-soft shadow-lg" : "border-navy/30 bg-white hover:border-crimson hover:bg-crimson-soft/40"
+                className={`group flex cursor-pointer flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-all ${
+                  dragging ? "scale-[1.01] border-crimson bg-crimson-soft" : "border-line bg-paper hover:border-navy hover:bg-navy/5"
                 }`}
               >
                 <input
                   type="file"
-                  accept=".xlsx, .xls"
+                  accept=".xlsx,.xls,.csv"
                   className="sr-only"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); e.target.value = ""; }}
                   disabled={busy}
-                  aria-label={t("upload_main_title")}
                 />
-
                 {busy ? (
                   <>
-                    <svg className="spin-slow" width="52" height="52" viewBox="0 0 40 40" aria-hidden="true">
+                    <svg className="spin-slow" width="56" height="56" viewBox="0 0 40 40" aria-hidden="true">
                       <circle cx="20" cy="20" r="16" fill="none" stroke="#d8dfec" strokeWidth="5" />
                       <path d="M20 4a16 16 0 0 1 16 16" fill="none" stroke="#c8102e" strokeWidth="5" strokeLinecap="round" />
                     </svg>
-                    <p className="text-base font-bold text-crimson">{t("processing")}</p>
+                    <p className="text-sm font-bold text-crimson">{t("processing")}</p>
                   </>
                 ) : (
                   <>
-                    {/* cloud upload + excel mark */}
-                    <span className="relative">
-                      <svg width="76" height="62" viewBox="0 0 76 62" aria-hidden="true" className="transition-transform duration-200 group-hover:-translate-y-1">
-                        <path d="M20 50a14 14 0 0 1-2.2-27.8A18 18 0 0 1 53 18.6 13 13 0 0 1 58 44" fill="none" stroke="#003893" strokeWidth="4.5" strokeLinecap="round" />
-                        <path d="M38 56V30m0 0l-9 9m9-9l9 9" fill="none" stroke="#c8102e" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                    {/* cloud upload + XLS badge */}
+                    <span className={`relative transition-transform duration-300 ${dragging ? "-translate-y-1.5" : "group-hover:-translate-y-1"}`}>
+                      <svg width="64" height="56" viewBox="0 0 64 56" aria-hidden="true">
+                        <path d="M20 46a12 12 0 0 1-2.2-23.8A16 16 0 0 1 49 18.6 11 11 0 0 1 47 40.5" fill="none" stroke="#003893" strokeWidth="4.4" strokeLinecap="round" />
+                        <path d="M32 52V30m0 0l-8 8m8-8l8 8" fill="none" stroke="#c8102e" strokeWidth="4.6" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
-                      <span className="absolute -bottom-1 -right-3 flex h-8 w-8 items-center justify-center rounded-md bg-pine font-display text-[0.72rem] font-bold text-white shadow-md">
-                        XLS
+                      <span className="absolute -right-3 -top-1 rounded bg-pine px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-white shadow">XLS</span>
+                    </span>
+                    <div>
+                      <p className="font-display text-[1.3rem] leading-snug text-navy-dark">
+                        {lang === "np" ? "राजस्व लक्ष्य तथा संकलन तथ्याङ्क अपलोड गर्नुहोस्" : "Upload Revenue Target & Collection Data"}
+                      </p>
+                      <p className="mt-1.5 text-sm font-medium text-ink-soft">
+                        {lang === "np"
+                          ? "आफ्नो Excel (.xlsx) फाइल यहाँ तान्नुहोस्, वा क्लिक गरी छान्नुहोस्।"
+                          : "Drag and drop your Excel (.xlsx) file here, or click to browse."}
+                      </p>
+                      <span className="mt-4 inline-block rounded-md bg-crimson px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors group-hover:bg-crimson-dark">
+                        {t("browse")}
                       </span>
-                    </span>
-                    <span>
-                      <span className="block font-display text-[1.3rem] leading-snug text-navy-dark">{t("upload_main_title")}</span>
-                      <span className="mt-1.5 block max-w-sm text-sm font-medium leading-relaxed text-ink-soft">{t("upload_main_sub")}</span>
-                    </span>
-                    <span className="mt-1 inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-crimson to-crimson-dark px-7 py-2.5 text-base font-bold text-white shadow-md transition-all duration-200 group-hover:shadow-lg group-hover:brightness-110">
-                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                        <path d="M2 11v2.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V11M8 1.5v8M8 1.5L4.8 4.7M8 1.5l3.2 3.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      {t("browse_files")}
-                    </span>
-                    <span className="text-xs font-medium text-ink-soft">
-                      {t("upload_excel_note")} · ≤ 5 MB
-                    </span>
+                    </div>
+                    <p className="text-xs font-semibold text-ink-soft">{lang === "np" ? ".xlsx, .xls, .csv मान्य · ५ MB सम्म" : "Accepts .xlsx, .xls, .csv · up to 5 MB"}</p>
                   </>
                 )}
               </label>
 
-              {/* expected columns + actions */}
-              <div className="mt-4 rounded-md bg-paper p-3.5">
-                <p className="text-xs font-extrabold uppercase tracking-wider text-navy">{t("expected_cols")}</p>
-                <p className="mt-1 font-mono text-[12px] font-semibold text-ink">month · target · collected · category (optional)</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">{t("office_cols_note")}</p>
+              <div className="mt-5 rounded-md bg-paper p-3.5">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-navy">{t("import_formats")}</p>
+                <p className="mt-1.5 text-[12px] leading-relaxed text-ink-soft">◈ {t("format_matrix")}</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">◈ {t("format_heads")}</p>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3">
-                <button onClick={() => { downloadFile("koteshwor-template.csv", OFFICE_TEMPLATE_CSV, "text/csv"); notify(t("export_done")); }} className="touch-target rounded-md border-2 border-navy px-4 py-2 text-sm font-bold text-navy transition-colors hover:bg-navy hover:text-white">
-                  ⬇ {t("template_download")}
+                <button onClick={() => void runDemo("matrix")} disabled={busy} className="touch-target rounded-md border-2 border-navy px-4 py-2 text-sm font-bold text-navy transition-colors hover:bg-navy hover:text-white disabled:opacity-50">
+                  ▶ {t("load_matrix_demo")}
                 </button>
-                <button onClick={runDemo} disabled={busy} className="touch-target rounded-md border-2 border-line px-4 py-2 text-sm font-bold text-ink-soft transition-colors hover:border-crimson hover:text-crimson disabled:opacity-50">
-                  ▶ {t("office_demo")}
+                <button onClick={() => void runDemo("book1")} disabled={busy} className="touch-target rounded-md border-2 border-line px-4 py-2 text-sm font-bold text-ink-soft transition-colors hover:border-crimson hover:text-crimson disabled:opacity-50">
+                  ▶ {t("load_book1_demo")}
                 </button>
+                {officeModified && (
+                  <button onClick={() => { resetOffice(); notify(t("national_restored")); }} className="touch-target rounded-md border-2 border-line px-4 py-2 text-sm font-bold text-ink-soft transition-colors hover:border-pine hover:text-pine">
+                    ↺ {t("restore_seeded")}
+                  </button>
+                )}
               </div>
             </div>
           </Reveal>
 
-          {/* ===== success card — live office dataset ===== */}
-          {officeActive && officeMeta && officeTotals && (
+          {/* success feedback */}
+          {success && lastResult && (
             <Reveal>
-              <div className="overflow-hidden rounded-lg border-2 border-pine/50 bg-card shadow-md">
-                <div className="flex items-center gap-4 bg-pine px-5 py-4 text-white">
-                  <span className="check-pop flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15 ring-4 ring-white/20">
+              <div className="rise-num rounded-lg border-2 border-pine bg-[#e9f6f0] p-5 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <span className="check-pop flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-pine text-white shadow-md">
                     <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M4.5 12.5l5 5L19.5 7" fill="none" stroke="#ffffff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M4.5 12.5l5 5L19.5 7" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </span>
-                  <div>
-                    <p className="font-display text-xl leading-tight">{t("upload_success_title")}</p>
-                    <p className="text-sm font-semibold text-white/85">{t("upload_success_msg")}</p>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-[1.25rem] leading-tight text-[#0b4a3c]">{t("upload_success")}</h3>
+                    <p className="mt-1 text-sm font-semibold text-[#0b4a3c]/80">
+                      {lastFile} · {fmtInt(lastResult.summary.ok, lang)} {t("parsed_rows")} · {t("updated_live")}
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] font-bold text-[#0b4a3c] sm:grid-cols-3">
+                      <span className="rounded bg-white/70 px-2.5 py-1.5">{t("head_target")}: {fmtTh(lastResult.partial.annualTarget ?? office.annualTarget, lang)}</span>
+                      <span className="rounded bg-white/70 px-2.5 py-1.5">{t("collected")}: {fmtTh((lastResult.partial.collectedCurrent?.[0] ?? null) ?? office.collectedCurrent[0] ?? 0, lang)}</span>
+                      <span className="rounded bg-white/70 px-2.5 py-1.5">{t("series_target")}: {lastResult.partial.target ? "✓" : "—"}</span>
+                    </div>
+                    <button onClick={() => setBoardOpen(true)} className="touch-target mt-4 rounded-md bg-navy-dark px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-navy">
+                      ▸ {t("board_mode")}
+                    </button>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
-                  <div className="bg-card p-3.5">
-                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("rows")}</p>
-                    <p className="mt-1 font-display text-2xl tabular-nums text-navy-dark">{fmtInt(officeMeta.rows, lang)}</p>
-                  </div>
-                  <div className="bg-card p-3.5">
-                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("target")}</p>
-                    <p className="mt-1 font-display text-2xl tabular-nums text-navy-dark">{fmtArba(officeTotals.target, lang)}</p>
-                  </div>
-                  <div className="bg-card p-3.5">
-                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("collected")}</p>
-                    <p className="mt-1 font-display text-2xl tabular-nums text-pine">{fmtArba(officeTotals.collected, lang)}</p>
-                  </div>
-                  <div className="bg-card p-3.5">
-                    <p className="text-[0.65rem] font-extrabold uppercase tracking-wider text-ink-soft">{t("uploaded_at")}</p>
-                    <p className="mt-1 text-sm font-bold leading-snug text-ink">{fmtDateTime(officeMeta.ts, lang)}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 border-t border-line bg-paper px-5 py-3.5">
-                  <p className="mr-auto max-w-full truncate font-mono text-[11px] font-semibold text-ink-soft" title={officeMeta.file}>
-                    {t("uploaded_file")}: {officeMeta.file}
-                  </p>
-                  <button onClick={() => setBoardOpen(true)} className="touch-target flex items-center gap-2 rounded-md bg-crimson px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-crimson-dark">
-                    <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true">
-                      <rect x="2" y="3" width="16" height="11" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                      <path d="M7 17h6M10 14v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                    {t("open_board")}
-                  </button>
-                  <button
-                    onClick={() => { clearOfficeData(); setPreview(null); setLastFile(null); notify(t("national_restored")); }}
-                    className="touch-target rounded-md border-2 border-line px-4 py-2 text-sm font-bold text-ink-soft transition-colors hover:border-navy hover:text-navy"
-                  >
-                    ↺ {t("restore_national")}
-                  </button>
                 </div>
               </div>
             </Reveal>
           )}
 
-          {/* ===== row preview ===== */}
+          {/* preview */}
           <Reveal delay={80}>
-            <div className="rounded-lg border border-line bg-card p-6 shadow-sm">
-              <h4 className="flex items-center justify-between text-sm font-extrabold text-navy-dark">
+            <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
+              <h4 className="flex items-center justify-between gap-2 text-sm font-extrabold text-navy-dark">
                 {t("preview_title")}
                 {lastFile && <span className="max-w-[55%] truncate rounded bg-paper px-2 py-0.5 font-mono text-[11px] font-semibold text-ink-soft" title={lastFile}>{lastFile}</span>}
               </h4>
-              {!preview ? (
+              {!lastResult ? (
                 <p className="mt-3 rounded-md border border-dashed border-line px-4 py-6 text-center text-xs font-medium text-ink-soft">{t("no_preview")}</p>
-              ) : (
-                <div className="mt-2 max-h-64 overflow-auto rounded-md border border-line">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-navy-dark text-left text-white">
+              ) : lastResult.preview.kind === "matrix" ? (
+                <div className="log-scroll mt-3 overflow-x-auto rounded-md border border-line">
+                  <table className="w-full min-w-[560px] text-xs">
+                    <thead className="bg-navy-dark text-left text-white">
                       <tr>
-                        <th className="px-2.5 py-1.5">#</th>
-                        <th className="px-2.5 py-1.5">{t("month_word")}</th>
-                        <th className="px-2.5 py-1.5">Category</th>
-                        <th className="px-2.5 py-1.5 text-right">{t("collected")}</th>
-                        <th className="px-2.5 py-1.5">{t("th_status")}</th>
+                        <th className="px-2.5 py-1.5">{lang === "np" ? "शृङ्खला" : "Series"}</th>
+                        {MONTH_COLS.slice(0, 4).map((m) => <th key={m.en} className="px-2 py-1.5 text-right">{lang === "np" ? m.np : m.en}</th>)}
+                        <th className="px-2 py-1.5 text-center">…</th>
+                        <th className="px-2.5 py-1.5 text-right">{lang === "np" ? "जम्मा" : "TOTAL"}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {preview.map((p) => (
-                        <tr key={p.row} className={`border-t border-line ${p.status === "error" ? "bg-crimson-soft" : p.status === "warning" ? "bg-[#fdf3d7]" : ""}`}>
-                          <td className="px-2.5 py-1.5 font-mono text-ink-soft">{p.row}</td>
-                          <td className="px-2.5 py-1.5 font-bold text-ink">{p.month}</td>
-                          <td className="px-2.5 py-1.5">{CATEGORIES.find((c) => c.id === p.category)?.[lang === "np" ? "np" : "en"] ?? p.category}</td>
-                          <td className="px-2.5 py-1.5 text-right tabular-nums">{p.collected}</td>
-                          <td className="px-2.5 py-1.5">
-                            <span className={`font-extrabold ${p.status === "error" ? "text-crimson" : p.status === "warning" ? "text-marigold" : "text-pine"}`}>
-                              {p.status === "error" ? "✗" : p.status === "warning" ? "!" : "✓"}{" "}
-                              {p.note ? p.note[lang] : p.status === "success" ? t("success") : ""}
-                            </span>
-                          </td>
+                      {lastResult.preview.series.map((s) => (
+                        <tr key={s.label} className="border-t border-line">
+                          <td className="px-2.5 py-1.5 font-bold text-ink">{s.label}</td>
+                          {s.values.slice(0, 4).map((v, i) => <td key={i} className="px-2 py-1.5 text-right tabular-nums">{v === null ? "—" : fmtTh(v, lang, 2)}</td>)}
+                          <td className="px-2 py-1.5 text-center text-ink-soft">…</td>
+                          <td className="px-2.5 py-1.5 text-right font-extrabold tabular-nums text-navy-dark">{fmtTh(s.total, lang)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="log-scroll mt-3 overflow-x-auto rounded-md border border-line">
+                  <table className="w-full min-w-[460px] text-xs">
+                    <thead className="bg-navy-dark text-left text-white">
+                      <tr>
+                        <th className="px-2.5 py-1.5">{t("head_name")}</th>
+                        <th className="px-2.5 py-1.5 text-right">{t("head_target")}</th>
+                        <th className="px-2.5 py-1.5 text-right">{t("head_collected")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lastResult.preview.heads.map((h) => (
+                        <tr key={h.name} className="border-t border-line">
+                          <td className="px-2.5 py-1.5 font-bold text-ink">{h.name}</td>
+                          <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtTh(h.target, lang)}</td>
+                          <td className="px-2.5 py-1.5 text-right tabular-nums text-pine">{fmtTh(h.collected, lang)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -447,11 +444,11 @@ export function ImportPanel() {
               {/* exports */}
               <div className="flex flex-wrap items-center gap-2 border-t border-line bg-paper px-4 py-3">
                 <span className="mr-1 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">CSV / JSON</span>
-                <button onClick={() => exportLogs("csv")} className="touch-target rounded-md border-2 border-navy px-3 py-1.5 text-xs font-bold text-navy hover:bg-navy hover:text-white">⬇ {t("export_logs_csv")}</button>
-                <button onClick={() => exportLogs("json")} className="touch-target rounded-md border-2 border-navy px-3 py-1.5 text-xs font-bold text-navy hover:bg-navy hover:text-white">⬇ {t("export_logs_json")}</button>
-                <span className="mx-1 hidden h-4 w-px bg-line sm:block" aria-hidden="true" />
                 <button onClick={() => exportData("csv")} className="touch-target rounded-md border-2 border-crimson px-3 py-1.5 text-xs font-bold text-crimson hover:bg-crimson hover:text-white">⬇ {t("export_data_csv")}</button>
                 <button onClick={() => exportData("json")} className="touch-target rounded-md border-2 border-crimson px-3 py-1.5 text-xs font-bold text-crimson hover:bg-crimson hover:text-white">⬇ {t("export_data_json")}</button>
+                <span className="mx-1 hidden h-4 w-px bg-line sm:block" aria-hidden="true" />
+                <button onClick={() => exportLogs("csv")} className="touch-target rounded-md border-2 border-navy px-3 py-1.5 text-xs font-bold text-navy hover:bg-navy hover:text-white">⬇ {t("export_logs_csv")}</button>
+                <button onClick={() => exportLogs("json")} className="touch-target rounded-md border-2 border-navy px-3 py-1.5 text-xs font-bold text-navy hover:bg-navy hover:text-white">⬇ {t("export_logs_json")}</button>
               </div>
             </div>
           </Reveal>

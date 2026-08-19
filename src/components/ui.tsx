@@ -29,7 +29,7 @@ export function Reveal({ children, delay = 0, className = "" }: { children: Reac
 }
 
 /* ---------------- animated count-up ---------------- */
-export function CountUp({ value, decimals = 1, duration = 1100, className = "" }: { value: number; decimals?: number; duration?: number; className?: string }) {
+export function CountUp({ value, decimals = 1, duration = 1100, className = "", grouping = "en-IN" }: { value: number; decimals?: number; duration?: number; className?: string; grouping?: "en-IN" | "en-US" }) {
   const { lang } = useApp();
   const [display, setDisplay] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
@@ -67,7 +67,7 @@ export function CountUp({ value, decimals = 1, duration = 1100, className = "" }
     return () => io.disconnect();
   }, [value, duration]);
 
-  const text = display.toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const text = display.toLocaleString(grouping, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   return (
     <span ref={ref} className={`rise-num tabular-nums ${className}`}>
       {lang === "np" ? text.replace(/[0-9]/g, (d) => "०१२३४५६७८९"[Number(d)]) : text}

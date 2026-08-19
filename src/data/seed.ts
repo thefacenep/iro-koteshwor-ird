@@ -28,8 +28,8 @@ export interface RevenueRecord {
   importedAt?: number;
 }
 
-export const CURRENT_FY = "2082/083";
-export const PREV_FY = "2081/082";
+export const CURRENT_FY = "2083/084";
+export const PREV_FY = "2082/083";
 
 export const CATEGORIES: Category[] = [
   { id: "income", en: "Income Tax", np: "आय कर", shortEn: "Income", shortNp: "आय", color: "#c8102e" },

@@ -1,21 +1,17 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { BoardMode } from "./components/BoardMode";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { ImportPanel } from "./components/import/ImportPanel";
 import { Masthead, type Tab } from "./components/Masthead";
 import { CountUp, ToastStack } from "./components/ui";
-import { totals } from "./data/seed";
-import { fmtDateTime } from "./lib/format";
+import { collectedToDate, toCrore } from "./data/office";
+import { fmtDateTime, fmtNum } from "./lib/format";
 import { AppProvider, useApp } from "./lib/store";
 
 /* ================= main title band ================= */
 function TitleBand() {
-  const { t, lang, records, officeActive } = useApp();
-  const tot = useMemo(() => totals(records), [records]);
-  const updated = useMemo(() => {
-    const stamps = records.filter((r) => r.importedAt).map((r) => r.importedAt as number);
-    return stamps.length ? Math.max(...stamps) : Date.now();
-  }, [records]);
+  const { t, lang, office } = useApp();
+  const collected = collectedToDate(office);
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-r from-navy to-navy-dark text-white">
@@ -39,19 +35,18 @@ function TitleBand() {
         </div>
 
         <div className="ml-auto flex items-center gap-5">
-          {officeActive && (
-            <span className="flex items-center gap-2 rounded-full border border-[#3ecf9a]/40 bg-[#3ecf9a]/10 px-3.5 py-1.5 text-xs font-extrabold tracking-wide text-[#7fe0bd]">
-              <span className="live-dot h-2 w-2 rounded-full bg-[#3ecf9a]" aria-hidden="true" />
-              {t("office_name")}
-            </span>
-          )}
+          <span className="flex items-center gap-2 rounded-full border border-[#3ecf9a]/40 bg-[#3ecf9a]/10 px-3.5 py-1.5 text-xs font-extrabold tracking-wide text-[#7fe0bd]">
+            <span className="live-dot h-2 w-2 rounded-full bg-[#3ecf9a]" aria-hidden="true" />
+            {t("office_name")}
+          </span>
           <div className="hidden text-right sm:block">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-white/55">{t("kpi_total_rev")}</p>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-white/55">{t("kpi_collected_shrawan")}</p>
             <p className="font-display text-[1.9rem] leading-tight tabular-nums text-gold">
-              <CountUp value={tot.collected} decimals={1} />
+              <CountUp value={collected} decimals={0} grouping="en-US" />
             </p>
             <p className="text-[11px] font-bold text-white/60">
-              {lang === "np" ? "अर्ब रुपैयाँ" : "Billion NPR"} · {t("data_updated")}: {fmtDateTime(updated, lang)}
+              {t("thousand_npr")} · ≈ {fmtNum(toCrore(collected), lang, 2)} {t("crore_word")}
+              {office.ts > 0 ? ` · ${t("data_updated")}: ${fmtDateTime(office.ts, lang)}` : ""}
             </p>
           </div>
         </div>
