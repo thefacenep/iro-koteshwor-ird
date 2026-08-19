@@ -1,0 +1,229 @@
+import type { Lang } from "./format";
+
+export type TKey = keyof typeof STRINGS;
+
+export const STRINGS = {
+  // identity
+  govtNp: "नेपाल सरकार",
+  govtEn: "Government of Nepal",
+  ministry: { en: "Ministry of Finance", np: "अर्थ मन्त्रालय" },
+  dept: { en: "Inland Revenue Department", np: "आन्तरिक राजस्व विभाग" },
+  portal: { en: "Revenue Transparency Portal", np: "राजस्व पारदर्शिता पोर्टल" },
+  tagline: {
+    en: "Every rupee accounted. Open data for every citizen.",
+    np: "हरेक रुपैयाँको हिसाब। हरेक नागरिकका लागि खुला तथ्याङ्क।",
+  },
+
+  // nav
+  nav_dashboard: { en: "Dashboard", np: "ड्यासबोर्ड" },
+  nav_import: { en: "Data Import & Logs", np: "तथ्याङ्क आयात तथा लग" },
+  board_mode: { en: "Display Board", np: "प्रदर्शन बोर्ड" },
+  exit_board: { en: "Exit Board", np: "बोर्ड बन्द गर्नुहोस्" },
+  board_hint: { en: "Tap left / right side to navigate · slides auto-advance", np: "बायाँ / दायाँ छेउ छुनुहोस् · स्लाइड आफैँ फेरिन्छ" },
+
+  // auth
+  login: { en: "Staff Login", np: "कर्मचारी प्रवेश" },
+  logout: { en: "Log out", np: "बाहिर निस्कनुहोस्" },
+  login_title: { en: "Secure staff access", np: "सुरक्षित कर्मचारी प्रवेश" },
+  login_sub: {
+    en: "Role-based access protects sensitive revenue data.",
+    np: "भूमिका-आधारित पहुँचले संवेदनशील राजस्व तथ्याङ्क सुरक्षित राख्छ।",
+  },
+  username: { en: "Username", np: "प्रयोगकर्ता नाम" },
+  password: { en: "Password", np: "पासवर्ड" },
+  sign_in: { en: "Sign in", np: "साइन इन गर्नुहोस्" },
+  cancel: { en: "Cancel", np: "रद्द गर्नुहोस्" },
+  login_error: { en: "Invalid username or password. Try the demo accounts below.", np: "गलत प्रयोगकर्ता नाम वा पासवर्ड। तलका डेमो खाता प्रयोग गर्नुहोस्।" },
+  demo_accounts: { en: "Demo accounts", np: "डेमो खाताहरू" },
+  role_admin: { en: "Administrator", np: "प्रशासक" },
+  role_viewer: { en: "Viewer", np: "अवलोकनकर्ता" },
+  role_public: { en: "Public visitor", np: "सर्वसाधारण" },
+  access_locked: { en: "Administrator access required", np: "प्रशासक पहुँच आवश्यक छ" },
+  access_locked_desc: {
+    en: "Data import, upload logs and exports are restricted to authorized IRD administrators. Sign in with an administrator account to continue.",
+    np: "तथ्याङ्क आयात, लग र निर्यात अधिकृत प्रशासकका लागि मात्र सीमित छन्। जारी राख्न प्रशासक खाताबाट साइन इन गर्नुहोस्।",
+  },
+  logged_in_as: { en: "Signed in as", np: "साइन इन भएको" },
+
+  // sync / offline
+  sync_online: { en: "Online", np: "अनलाइन" },
+  sync_offline: { en: "Offline", np: "अफलाइन" },
+  sync_pending: { en: "pending sync", np: "सिंक बाँकी" },
+  sync_now: { en: "Sync now", np: "अहिले सिंक गर्नुहोस्" },
+  syncing: { en: "Syncing…", np: "सिंक हुँदै…" },
+  last_sync: { en: "Last sync", np: "अन्तिम सिंक" },
+  never: { en: "never", np: "कहिल्यै" },
+  offline_banner: {
+    en: "No internet connection — the portal keeps working offline. Imported records will sync automatically when connection returns.",
+    np: "इन्टरनेट जडान छैन — पोर्टल अफलाइनमै चालु रहन्छ। आयात गरिएका तथ्याङ्क जडान फर्किएपछि स्वतः सिंक हुनेछन्।",
+  },
+  sync_done: { en: "All records synchronised with central server", np: "सबै तथ्याङ्क केन्द्रीय सर्भरसँग सिंक भयो" },
+  saved_offline: { en: "Saved offline — will sync later", np: "अफलाइन सुरक्षित — पछि सिंक हुनेछ" },
+
+  // KPI
+  kpi_total_rev: { en: "Total Revenue Collected", np: "जम्मा राजस्व संकलन" },
+  kpi_total_rev_sub: { en: "Current fiscal year to date", np: "चालु आर्थिक वर्ष" },
+  kpi_achievement: { en: "Target Achievement", np: "लक्ष्य प्राप्ति" },
+  kpi_achievement_sub: { en: "Against annual revised target", np: "वार्षिक संशोधित लक्ष्यको आधारमा" },
+  kpi_growth: { en: "Year-on-Year Growth", np: "वार्षिक वृद्धि" },
+  kpi_growth_sub: { en: "Compared with previous fiscal year", np: "गत आर्थिक वर्षको तुलनामा" },
+  kpi_top_month: { en: "Best Collection Month", np: "सर्वोच्च संकलन महिना" },
+  kpi_top_month_sub: { en: "Highest monthly collection", np: "मासिक उच्च संकलन" },
+  of_target: { en: "of annual target", np: "वार्षिक लक्ष्यको" },
+  annual_target: { en: "Annual target", np: "वार्षिक लक्ष्य" },
+  unit_note: { en: "Figures in NPR billions (arba)", np: "आँकडा नेपाली रुपैयाँ अर्बमा" },
+
+  // chart sections
+  section_overview: { en: "Revenue Overview", np: "राजस्व अवलोकन" },
+  section_monthly: { en: "Monthly Collection by Tax Category", np: "कर शीर्षक अनुसार मासिक संकलन" },
+  section_monthly_sub: {
+    en: "Stacked view — how each month's collection is composed across the five tax heads.",
+    np: "थुप्रिएको दृश्य — हरेक महिनाको संकलन पाँच कर शीर्षकमा कसरी बाँडिएको छ।",
+  },
+  section_share: { en: "Share by Tax Head", np: "कर शीर्षक अनुसार हिस्सा" },
+  section_share_sub: { en: "Contribution of each tax head to total revenue", np: "कुल राजस्वमा प्रत्येक कर शीर्षकको योगदान" },
+  section_trend: { en: "Collection vs Target — 12 Month Trend", np: "संकलन विरुद्ध लक्ष्य — १२ महिने प्रवृत्ति" },
+  section_trend_sub: {
+    en: "Solid line: collected · Dashed line: monthly target. The Ashadh year-end push is clearly visible.",
+    np: "मोटो रेखा: संकलन · धर्सो रेखा: मासिक लक्ष्य। असारको वर्ष-अन्त्य उकालो स्पष्ट देखिन्छ।",
+  },
+  section_compare: { en: "Fiscal Year Comparison", np: "आर्थिक वर्ष तुलना" },
+  section_compare_sub: {
+    en: "Total collection by tax head — previous year against current year.",
+    np: "कर शीर्षक अनुसार कुल संकलन — गत वर्ष र चालु वर्ष।",
+  },
+  section_table: { en: "Historical Trend Analysis", np: "ऐतिहासिक प्रवृत्ति विश्लेषण" },
+  section_table_sub: {
+    en: "Month-by-month targets, achievement and growth. Scroll for all twelve months.",
+    np: "महिना अनुसार लक्ष्य, प्राप्ति र वृद्धि। बाह्रै महिनाका लागि तल स्क्रोल गर्नुहोस्।",
+  },
+
+  // chart labels
+  collected: { en: "Collected", np: "संकलन" },
+  target: { en: "Target", np: "लक्ष्य" },
+  prev_fy: { en: "Previous FY", np: "गत आ.व." },
+  current_fy: { en: "Current FY", np: "चालु आ.व." },
+  share: { en: "share", np: "हिस्सा" },
+  total: { en: "Total", np: "जम्मा" },
+  month_word: { en: "Month", np: "महिना" },
+  achievement: { en: "Achievement", np: "प्राप्ति" },
+  growth: { en: "Growth", np: "वृद्धि" },
+
+  // table
+  th_month: { en: "Month (BS)", np: "महिना (वि.सं.)" },
+  th_target: { en: "Target", np: "लक्ष्य" },
+  th_collected: { en: "Collected", np: "संकलन" },
+  th_achieved: { en: "Achieved", np: "प्राप्ति %" },
+  th_growth: { en: "YoY Growth", np: "वार्षिक वृद्धि" },
+  th_status: { en: "Status", np: "स्थिति" },
+  on_track: { en: "On track", np: "लक्ष्य अनुरुप" },
+  needs_push: { en: "Needs push", np: "थप प्रयास आवश्यक" },
+  behind: { en: "Behind", np: "पछाडि" },
+
+  // import panel
+  import_title: { en: "Automated Data Import", np: "स्वचालित तथ्याङ्क आयात" },
+  import_sub: {
+    en: "Upload Excel or CSV sheets exported from the revenue system. Rows are validated automatically — no manual entry.",
+    np: "राजस्व प्रणालीबाट निर्यात भएका एक्सेल वा CSV सिट अपलोड गर्नुहोस्। पङ्क्तिहरू स्वतः जाँच हुन्छन् — म्यानुअल प्रविष्टि आवश्यक छैन।",
+  },
+  upload_title: { en: "Upload data file", np: "तथ्याङ्क फाइल अपलोड" },
+  drop_hint: { en: "Drag & drop your file here, or", np: "फाइल यहाँ तान्नुहोस्, वा" },
+  browse: { en: "Browse files", np: "फाइल छान्नुहोस्" },
+  accepted: { en: "Accepts .xlsx, .xls, .csv · up to 5 MB", np: ".xlsx, .xls, .csv मान्य · ५ MB सम्म" },
+  expected_cols: { en: "Expected columns", np: "आवश्यक स्तम्भहरू" },
+  template_download: { en: "Download CSV template", np: "CSV टेम्प्लेट डाउनलोड" },
+  demo_batch: { en: "Run demo batch (with sample errors)", np: "डेमो ब्याच चलाउनुहोस् (नमुना त्रुटिसहित)" },
+  processing: { en: "Validating rows…", np: "पङ्क्ति जाँच हुँदैछ…" },
+  preview_title: { en: "Row preview", np: "पङ्क्ति पूर्वावलोकन" },
+  no_preview: { en: "No file processed yet. Upload a sheet to see validation results here.", np: "अहिलेसम्म कुनै फाइल प्रशोधन भएको छैन। नतिजा हेर्न सिट अपलोड गर्नुहोस्।" },
+
+  // log + stats
+  log_title: { en: "Real-time Import Log", np: "प्रत्यक्ष आयात लग" },
+  log_empty: { en: "No log entries yet.", np: "अहिलेसम्म लग छैन।" },
+  stat_uploads: { en: "Upload sessions", np: "अपलोड सत्र" },
+  stat_success: { en: "Rows imported", np: "आयात भएका पङ्क्ति" },
+  stat_failed: { en: "Rows failed", np: "असफल पङ्क्ति" },
+  stat_warnings: { en: "Warnings", np: "चेतावनी" },
+  filter_from: { en: "From", np: "देखि" },
+  filter_to: { en: "To", np: "सम्म" },
+  filter_status: { en: "Status", np: "स्थिति" },
+  all: { en: "All", np: "सबै" },
+  success: { en: "Success", np: "सफल" },
+  error: { en: "Error", np: "त्रुटि" },
+  warning: { en: "Warning", np: "चेतावनी" },
+  info: { en: "Info", np: "जानकारी" },
+  clear_filters: { en: "Clear", np: "खाली गर्नुहोस्" },
+  export_logs_csv: { en: "Export logs CSV", np: "लग CSV निर्यात" },
+  export_logs_json: { en: "Export logs JSON", np: "लग JSON निर्यात" },
+  export_data_csv: { en: "Export data CSV", np: "तथ्याङ्क CSV निर्यात" },
+  export_data_json: { en: "Export data JSON", np: "तथ्याङ्क JSON निर्यात" },
+  export_done: { en: "Export ready — file downloaded", np: "निर्यात तयार — फाइल डाउनलोड भयो" },
+  import_done: { en: "Import finished", np: "आयात सम्पन्न भयो" },
+  entries: { en: "entries", np: "प्रविष्टि" },
+
+  // log messages
+  log_session_start: { en: "Import session started", np: "आयात सत्र सुरु भयो" },
+  log_session_done: { en: "Import session finished", np: "आयात सत्र समाप्त भयो" },
+  log_row_ok: { en: "Row accepted", np: "पङ्क्ति स्वीकृत" },
+  log_row_dup: { en: "Possible duplicate — accepted with flag", np: "सम्भावित नक्कल — चिन्हसहित स्वीकृत" },
+  log_row_outlier: { en: "Value unusually high — accepted with warning", np: "असामान्य उच्च मान — चेतावनीसहित स्वीकृत" },
+  log_err_missing: { en: "Missing required value", np: "आवश्यक मान छैन" },
+  log_err_category: { en: "Unknown tax category", np: "अज्ञात कर शीर्षक" },
+  log_err_month: { en: "Invalid month (use 1–12 or BS month name)", np: "अमान्य महिना (१–१२ वा नेपाली महिना नाम प्रयोग गर्नुहोस्)" },
+  log_err_numeric: { en: "Amount must be a number", np: "रकम अङ्कमा हुनुपर्छ" },
+  log_err_negative: { en: "Amount cannot be negative", np: "रकम ऋणात्मक हुन सक्दैन" },
+  log_file_ok: { en: "File parsed successfully", np: "फाइल सफलतापूर्वक पढियो" },
+  log_file_err: { en: "Could not read file", np: "फाइल पढ्न सकिएन" },
+  log_sync: { en: "Records synchronised with central server", np: "तथ्याङ्क केन्द्रीय सर्भरसँग सिंक भयो" },
+
+  // footer
+  footer_about: {
+    en: "This portal publishes unaudited provisional revenue figures for public transparency. Figures are updated automatically from the Integrated Tax System and may be revised after audit.",
+    np: "यो पोर्टलले सार्वजनिक पारदर्शिताका लागि अलेखापरीक्षण भएका अस्थायी राजस्व आँकडा प्रकाशित गर्दछ। आँकडा एकीकृत कर प्रणालीबाट स्वतः अपडेट हुन्छन् र लेखापरीक्षणपछि संशोधन हुन सक्छन्।",
+  },
+  footer_helpline: { en: "Citizen helpline", np: "नागरिक हेल्पलाइन" },
+  footer_updated: { en: "Data last updated", np: "तथ्याङ्क अन्तिम अपडेट" },
+  footer_rights: { en: "Inland Revenue Department · Babarmahal, Kathmandu", np: "आन्तरिक राजस्व विभाग · बबरमहल, काठमाडौँ" },
+  footer_lang: { en: "Available in नेपाली and English", np: "नेपाली र English मा उपलब्ध" },
+
+  // notices ticker
+  notice1: {
+    en: "FY 2081/82 revenue collection crosses 60% of annual target — thank you, taxpayers of Nepal.",
+    np: "आ.व. २०८१/८२ को राजस्व संकलन वार्षिक लक्ष्यको ६०% नाघ्यो — करदाताहरूलाई धन्यवाद।",
+  },
+  notice2: {
+    en: "File your income tax returns before the end of Ashadh — avoid late fees.",
+    np: "असार मसान्तभित्र आयकर विवरण पेस गर्नुहोस् — ढिलाइ दस्तुरबाट बच्नुहोस्।",
+  },
+  notice3: {
+    en: "New: pay taxes online from anywhere via connectIPS — no office visit needed.",
+    np: "नयाँ: connectIPS मार्फत जहाँबाट पनि कर तिर्नुहोस् — कार्यालय धाउनु पर्दैन।",
+  },
+  notice4: {
+    en: "Display boards now live at all 581 taxpayer service offices across 77 districts.",
+    np: "७७ वटै जिल्लाका ५८१ करदाता सेवा कार्यालयमा प्रदर्शन बोर्ड सञ्चालनमा।",
+  },
+
+  // misc
+  loading_portal: { en: "Loading portal…", np: "पोर्टल लोड हुँदैछ…" },
+  data_updated: { en: "Updated", np: "अपडेट" },
+  fiscal_year: { en: "Fiscal Year", np: "आर्थिक वर्ष" },
+  rows: { en: "rows", np: "पङ्क्ति" },
+  file: { en: "File", np: "फाइल" },
+  time: { en: "Time", np: "समय" },
+  message: { en: "Message", np: "सन्देश" },
+  font_size: { en: "Text size", np: "अक्षर आकार" },
+  language_label: { en: "भाषा / Language", np: "भाषा / Language" },
+  close: { en: "Close", np: "बन्द गर्नुहोस्" },
+  go_back: { en: "Back to dashboard", np: "ड्यासबोर्डमा फर्कनुहोस्" },
+  secure_note: {
+    en: "Protected by role-based access control. All import activity is logged.",
+    np: "भूमिका-आधारित पहुँच नियन्त्रणद्वारा सुरक्षित। सबै आयात गतिविधि लग गरिन्छ।",
+  },
+} as const;
+
+export function translate(key: TKey, lang: Lang): string {
+  const v = STRINGS[key];
+  if (typeof v === "string") return v;
+  return (v as { en: string; np: string })[lang];
+}
