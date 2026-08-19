@@ -1,18 +1,12 @@
-import { useMemo } from "react";
 import { fmtDateTime } from "../../lib/format";
 import { useApp } from "../../lib/store";
-import { Reveal, SectionHead } from "../ui";
+import { Reveal } from "../ui";
 import { KpiTiles } from "./KpiTiles";
 import { ChartCard, DonutChart, GroupedBarChart, StackedBarChart, TrendLineChart } from "./charts";
 import { TrendTable } from "./TrendTable";
 
 export function Dashboard() {
-  const { t, lang, records, officeActive, officeMeta, clearOfficeData, notify } = useApp();
-
-  const updated = useMemo(() => {
-    const imported = records.filter((r) => r.importedAt).map((r) => r.importedAt as number);
-    return imported.length ? Math.max(...imported) : Date.now();
-  }, [records]);
+  const { t, lang, officeActive, officeMeta, clearOfficeData, notify } = useApp();
 
   return (
     <div className="space-y-10">
@@ -40,23 +34,6 @@ export function Dashboard() {
           </div>
         </Reveal>
       )}
-
-      {/* intro band */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <SectionHead
-          kicker={t("section_overview")}
-          title={officeActive ? t("office_name") : t("portal")}
-          sub={officeActive ? undefined : t("tagline")}
-        />
-        <Reveal delay={120}>
-          <p className="flex items-center gap-2 rounded-md border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink-soft shadow-sm">
-            <span className="live-dot h-2 w-2 rounded-full bg-pine" aria-hidden="true" />
-            {t("data_updated")}: {fmtDateTime(updated, lang)}
-            <span className="mx-1 h-3 w-px bg-line" aria-hidden="true" />
-            {t("unit_note")}
-          </p>
-        </Reveal>
-      </div>
 
       <KpiTiles />
 

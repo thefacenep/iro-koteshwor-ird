@@ -164,12 +164,10 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
       {/* utility strip */}
       <div className="bg-navy-deep text-white">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 text-xs font-semibold sm:px-6">
-          <span className="mr-auto tracking-wide text-white/90">
-            {t("govtNp")} · {t("govtEn")} — {t("ministry")}
-          </span>
-
-          {/* live clock + temperature */}
-          <ClockTempWidget />
+          {/* right-aligned utility cluster (top government bar removed) */}
+          <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+            {/* live clock + temperature */}
+            <ClockTempWidget />
 
           {/* sync status */}
           <span
@@ -212,33 +210,25 @@ export function Masthead({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
                 {t("logout")}
               </button>
             </span>
-          ) : (
-            <button onClick={() => setLoginOpen(true)} className="touch-target rounded bg-crimson px-3.5 py-1 font-bold text-white hover:bg-crimson-dark">
-              {t("login")}
-            </button>
-          )}
+            ) : (
+              <button onClick={() => setLoginOpen(true)} className="touch-target rounded bg-crimson px-3.5 py-1 font-bold text-white hover:bg-crimson-dark">
+                {t("login")}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* masthead identity */}
-      <div className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
-          <div className="min-w-0">
-            <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-crimson">{t("ministry")}</p>
-            <h1 className="font-display text-[1.5rem] leading-tight text-navy-dark sm:text-[2rem]">
-              {lang === "np" ? "आन्तरिक राजस्व कार्यालय कोटेश्वर" : "Inland Revenue Office Koteshwor"}
-            </h1>
-            <p className="text-sm font-semibold text-navy/80">
-              {lang === "np" ? "Inland Revenue Office Koteshwor" : "आन्तरिक राजस्व कार्यालय कोटेश्वर"}
-              <span className="mx-2 text-crimson" aria-hidden="true">·</span>
-              {t("portal")}
-            </p>
-          </div>
-          <p className="ml-auto hidden max-w-[240px] text-right text-xs font-medium leading-snug text-ink-soft lg:block">
-            {t("tagline")}
+      <div className="border-b-4 border-crimson bg-white">
+        <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
+          <h1 className="font-display text-[1.55rem] leading-tight text-crimson sm:text-[2rem]">
+            {lang === "np" ? "आन्तरिक राजस्व कार्यालय कोटेश्वर" : "Inland Revenue Office Koteshwor"}
+          </h1>
+          <p className="mt-1 text-sm font-semibold text-ink-soft">
+            {lang === "np" ? "Inland Revenue Office Koteshwor" : "आन्तरिक राजस्व कार्यालय कोटेश्वर"}
           </p>
         </div>
-        <div className="dhaka-stripe h-[5px]" aria-hidden="true" />
       </div>
 
       {/* nav + board */}

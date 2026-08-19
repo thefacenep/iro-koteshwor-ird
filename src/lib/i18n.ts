@@ -13,6 +13,7 @@ export const STRINGS = {
     en: "Every rupee accounted. Open data for every citizen.",
     np: "हरेक रुपैयाँको हिसाब। हरेक नागरिकका लागि खुला तथ्याङ्क।",
   },
+  dashboard_title: { en: "Revenue Collection Dashboard", np: "राजस्व संकलन ड्यासबोर्ड" },
 
   // nav
   nav_dashboard: { en: "Dashboard", np: "ड्यासबोर्ड" },
