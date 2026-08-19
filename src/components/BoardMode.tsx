@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { achievementPct, collectedToDate, toCrore, yoyPct } from "../data/office";
+import { achievementPct, chartCategories, collectedToDate, toCrore, yoyPct } from "../data/office";
 import { CURRENT_FY } from "../data/seed";
 import { fmtNum, toNpDigits } from "../lib/format";
 import { useApp } from "../lib/store";
+import { CollectionDonut, GrowthCompareChart } from "./dashboard/CategoryAnalysis";
 import { FyCompareChart, GapStackChart, QuarterDonut, TrendLineChart } from "./dashboard/charts";
 import { TrendTable } from "./dashboard/TrendTable";
 import { Emblem } from "./ui";
@@ -18,7 +19,7 @@ export function BoardMode() {
   const [clock, setClock] = useState(new Date());
   const reduced = useRef(false);
 
-  const SLIDES = 5;
+  const SLIDES = 6;
 
   useEffect(() => {
     reduced.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -42,6 +43,8 @@ export function BoardMode() {
     [office]
   );
 
+  const boardCats = useMemo(() => chartCategories(office.categories), [office.categories]);
+
   const go = useCallback((dir: 1 | -1) => setSlide((s) => (s + dir + SLIDES) % SLIDES), []);
 
   const clockStr = clock.toLocaleTimeString("en-GB");
@@ -51,6 +54,7 @@ export function BoardMode() {
     t("section_trend"),
     t("section_compare"),
     t("section_gap"),
+    t("section_category_analysis"),
     t("section_table"),
   ][slide];
 
@@ -138,6 +142,18 @@ export function BoardMode() {
             </div>
           )}
           {slide === 4 && (
+            <div className="grid items-stretch gap-6 lg:grid-cols-2">
+              <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
+                <h3 className="mb-2 font-display text-[1.15rem] text-navy-dark">{t("chart_collection_share")}</h3>
+                <CollectionDonut data={boardCats} />
+              </div>
+              <div className="rounded-lg border border-line bg-card p-5 shadow-sm">
+                <h3 className="mb-2 font-display text-[1.15rem] text-navy-dark">{t("chart_growth_yoy")}</h3>
+                <GrowthCompareChart data={boardCats} compact />
+              </div>
+            </div>
+          )}
+          {slide === 5 && (
             <div className="rounded-lg border border-line bg-card p-4 shadow-sm">
               <TrendTable compact />
             </div>

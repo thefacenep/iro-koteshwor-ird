@@ -43,11 +43,83 @@ export const TOTAL_COLLECTION_PREV = 4906449;
 
 export const SEED_FILE = "Revenue target of each month.xlsx";
 
-export interface OfficeHead {
+/* ---------------- revenue category data (Book1.xlsx, Shrawan) ---------------- */
+
+export interface RevenueCategoryData {
+  id: string;
   name: string;
-  target: number;
-  collected: number;
+  nameNepali: string;
+  color: string;
+  annualTarget: number;
+  monthlyTarget: number;
+  monthlyCollection: number;
+  achievementPercent: number;
+  contributionPercent: number;
+  previousYearCollection: number;
+  growthPercent: number;
+  nextMonthTarget: number;
+  isSubtotal?: boolean;
+  isTotal?: boolean;
 }
+
+export const CAT_COLORS = {
+  income: "#1e3a8a",
+  rent: "#7e22ce",
+  interest: "#eab308",
+  vat: "#dc143c",
+  excise: "#059669",
+  other: "#ea580c",
+} as const;
+
+/** Exact rows from Book1.xlsx (श्रावण महिना सम्म) — amounts in thousand NPR */
+const CAT_ROW = (
+  id: keyof typeof CAT_COLORS,
+  name: string,
+  nameNepali: string,
+  annualTarget: number,
+  monthlyTarget: number,
+  monthlyCollection: number,
+  achievementPercent: number,
+  contributionPercent: number,
+  previousYearCollection: number,
+  growthPercent: number,
+  extra?: Partial<RevenueCategoryData>
+): RevenueCategoryData => ({
+  id,
+  name,
+  nameNepali,
+  color: CAT_COLORS[id],
+  annualTarget,
+  monthlyTarget,
+  monthlyCollection,
+  achievementPercent,
+  contributionPercent,
+  previousYearCollection,
+  growthPercent,
+  nextMonthTarget: 0,
+  ...extra,
+});
+
+export const SEED_CATEGORIES: RevenueCategoryData[] = [
+  CAT_ROW("income", "Income Tax", "आयकर", 2282628, 136409, 144836, 106, 26.2, 93698, 155),
+  CAT_ROW("rent", "Rent Income Tax", "बहाल कर", 36057, 2895, 1921, 66, 0.35, 922, 208),
+  CAT_ROW("interest", "Interest Tax", "ब्याज कर", 101858, 22289, 9065, 41, 1.64, 11012, 82),
+  CAT_ROW("income", "Total Income Tax", "जम्मा आयकर", 2420543, 161593, 155822, 96, 28.2, 105632, 148, {
+    isSubtotal: true,
+    color: "#33518f",
+  }),
+  CAT_ROW("vat", "Value Added Tax", "मू.अ.कर", 1766107, 154840, 224102, 145, 40.54, 177602, 126),
+  CAT_ROW("excise", "Excise Duty", "अन्तःशुल्क", 1935042, 132121, 170015, 129, 30.76, 155154, 110),
+  CAT_ROW("other", "Other Taxes", "अन्य कर", 0, 271, 2786, 1027, 0.5, 78, 3572),
+  CAT_ROW("income", "Grand Total", "कुल जम्मा", 6121691, 448825, 552725, 123, 100, 438467, 126, {
+    isTotal: true,
+    color: "#0b2260",
+  }),
+];
+
+/** the six charted categories (subtotal & grand total excluded) */
+export const chartCategories = (cats: RevenueCategoryData[]): RevenueCategoryData[] =>
+  cats.filter((c) => !c.isSubtotal && !c.isTotal);
 
 export interface OfficeData {
   /** monthly target, FY 2083/084 (thousand NPR) */
@@ -60,8 +132,8 @@ export interface OfficeData {
   prevShrawan: number;
   /** annual target override (thousand NPR) */
   annualTarget: number;
-  /** optional per-head breakdown (Book1.xlsx format) */
-  heads: OfficeHead[];
+  /** per-category breakdown (Book1.xlsx format) */
+  categories: RevenueCategoryData[];
   file: string;
   ts: number;
 }
@@ -72,7 +144,7 @@ export const REAL_OFFICE: OfficeData = {
   collectedCurrent: [CURRENT_SHRAWAN, null, null, null, null, null, null, null, null, null, null, null],
   prevShrawan: PREV_SHRAWAN,
   annualTarget: TOTAL_TARGET,
-  heads: [],
+  categories: SEED_CATEGORIES,
   file: SEED_FILE,
   ts: 0, // 0 = seeded from the official sheets
 };

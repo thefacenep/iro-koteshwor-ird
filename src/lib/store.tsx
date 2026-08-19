@@ -95,7 +95,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
      and the dashboard / display board re-render instantly. */
   const [office, setOfficeState] = useState<OfficeData>(() => {
     const stored = load<OfficeData | null>("np-rev-office-v3", null);
-    return stored && Array.isArray(stored.target) && stored.target.length === 12 ? stored : { ...REAL_OFFICE };
+    return stored && Array.isArray(stored.target) && stored.target.length === 12 && Array.isArray(stored.categories)
+      ? stored
+      : { ...REAL_OFFICE };
   });
 
   const applyOfficeImport = useCallback((partial: Partial<OfficeData>, file: string) => {

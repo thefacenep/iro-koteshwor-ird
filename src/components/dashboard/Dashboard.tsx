@@ -1,6 +1,7 @@
 import { fmtDateTime } from "../../lib/format";
 import { useApp } from "../../lib/store";
 import { Reveal, SectionHead } from "../ui";
+import { CategoryAnalysis } from "./CategoryAnalysis";
 import { KpiTiles } from "./KpiTiles";
 import { ChartCard, FyCompareChart, GapStackChart, QuarterDonut, TrendLineChart } from "./charts";
 import { TrendTable, TrendTableNote } from "./TrendTable";
@@ -44,6 +45,16 @@ export function Dashboard() {
       </Reveal>
 
       <KpiTiles />
+
+      {/* revenue category analysis — Shrawan, Book1.xlsx */}
+      <div className="space-y-6">
+        <SectionHead
+          kicker={t("analysis_kicker")}
+          title={lang === "np" ? "राजस्व विश्लेषण" : "Revenue Category Analysis"}
+          sub={t("section_category_sub")}
+        />
+        <CategoryAnalysis />
+      </div>
 
       {/* trend line + quarterly donut */}
       <div className="grid gap-6 xl:grid-cols-12">

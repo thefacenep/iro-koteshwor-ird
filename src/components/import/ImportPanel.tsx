@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MONTH_COLS } from "../../data/office";
-import { downloadFile, fmtDateTime, fmtInt, fmtTime, toCSV, toNpDigits } from "../../lib/format";
+import { downloadFile, fmtDateTime, fmtInt, fmtNum, fmtTime, toCSV, toNpDigits } from "../../lib/format";
 import type { LogEntry, LogLevel } from "../../lib/importer";
 import { demoBook1Batch, demoMatrixBatch, parseOfficeFile, type OfficeImportResult } from "../../lib/officeParser";
 import { useApp } from "../../lib/store";
@@ -347,20 +347,36 @@ export function ImportPanel() {
                 </div>
               ) : (
                 <div className="log-scroll mt-3 overflow-x-auto rounded-md border border-line">
-                  <table className="w-full min-w-[460px] text-xs">
+                  <table className="w-full min-w-[560px] text-xs">
                     <thead className="bg-navy-dark text-left text-white">
                       <tr>
-                        <th className="px-2.5 py-1.5">{t("head_name")}</th>
-                        <th className="px-2.5 py-1.5 text-right">{t("head_target")}</th>
-                        <th className="px-2.5 py-1.5 text-right">{t("head_collected")}</th>
+                        <th className="px-2.5 py-1.5">{t("th_revenue_head")}</th>
+                        <th className="px-2.5 py-1.5 text-right">{t("th_monthly_target")}</th>
+                        <th className="px-2.5 py-1.5 text-right">{t("th_monthly_collection")}</th>
+                        <th className="px-2.5 py-1.5 text-right">{t("th_achievement")}</th>
+                        <th className="px-2.5 py-1.5 text-right">{t("th_contribution")}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {lastResult.preview.heads.map((h) => (
-                        <tr key={h.name} className="border-t border-line">
-                          <td className="px-2.5 py-1.5 font-bold text-ink">{h.name}</td>
-                          <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtTh(h.target, lang)}</td>
-                          <td className="px-2.5 py-1.5 text-right tabular-nums text-pine">{fmtTh(h.collected, lang)}</td>
+                      {lastResult.preview.categories.map((c, i) => (
+                        <tr
+                          key={i}
+                          className={`border-t border-line ${c.isTotal ? "bg-navy-dark text-white" : c.isSubtotal ? "bg-[#eef1f9] font-bold" : ""}`}
+                        >
+                          <td className="px-2.5 py-1.5">
+                            <span className="flex items-center gap-2">
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ background: c.color }} aria-hidden="true" />
+                              <span className={`font-bold ${c.isTotal ? "text-white" : "text-ink"}`}>
+                                {c.isTotal ? t("cat_grand_total") : c.isSubtotal ? t("cat_subtotal_income") : lang === "np" ? c.nameNepali : c.name}
+                              </span>
+                            </span>
+                          </td>
+                          <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtTh(c.monthlyTarget, lang)}</td>
+                          <td className="px-2.5 py-1.5 text-right font-extrabold tabular-nums">{fmtTh(c.monthlyCollection, lang)}</td>
+                          <td className={`px-2.5 py-1.5 text-right font-extrabold tabular-nums ${c.achievementPercent > 100 ? "text-pine" : c.achievementPercent >= 80 ? "text-marigold" : "text-crimson"} ${c.isTotal ? "text-gold" : ""}`}>
+                            {fmtInt(c.achievementPercent, lang)}%
+                          </td>
+                          <td className="px-2.5 py-1.5 text-right tabular-nums">{fmtNum(c.contributionPercent, lang, 2)}%</td>
                         </tr>
                       ))}
                     </tbody>
